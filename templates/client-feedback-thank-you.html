@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thank You | UPHS Portal</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+<link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+<style>
+:root {
+    --primary-green: #1cc88a;
+    --dark-green: #13855c;
+    --warning-yellow: #f6c23e;
+}
+
+body {
+    background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.thank-you-container {
+    max-width: 600px;
+    width: 100%;
+}
+
+.thank-you-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    text-align: center;
+}
+
+.success-header {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    padding: 3rem 2rem;
+    position: relative;
+}
+
+.success-icon {
+    width: 100px;
+    height: 100px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    animation: scaleIn 0.5s ease-out;
+}
+
+.success-icon i {
+    font-size: 3rem;
+    color: var(--primary-green);
+    animation: checkmark 0.8s ease-out 0.3s both;
+}
+
+.success-header h1 {
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    animation: fadeInUp 0.6s ease-out 0.2s both;
+}
+
+.card-content {
+    padding: 2.5rem;
+}
+
+.thank-you-message {
+    color: #2c3e50;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    animation: fadeInUp 0.6s ease-out 0.4s both;
+}
+
+.thank-you-message p {
+    margin-bottom: 1rem;
+}
+
+.thank-you-message .highlight {
+    color: var(--primary-green);
+    font-weight: 600;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+    animation: fadeInUp 0.6s ease-out 0.6s both;
+}
+
+.feature-item {
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(28, 200, 138, 0.05), rgba(19, 133, 92, 0.05));
+    border-radius: 12px;
+    transition: transform 0.3s ease;
+}
+
+.feature-item:hover {
+    transform: translateY(-5px);
+}
+
+.feature-item i {
+    font-size: 2rem;
+    color: var(--primary-green);
+    margin-bottom: 0.5rem;
+}
+
+.feature-item h4 {
+    font-size: 0.9rem;
+    color: #2c3e50;
+    font-weight: 600;
+    margin: 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+    animation: fadeInUp 0.6s ease-out 0.8s both;
+}
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 10px;
+    color: white;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(28, 200, 138, 0.3);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-secondary-custom {
+    background: white;
+    border: 2px solid #e0e0e0;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    font-size: 1rem;
+    border-radius: 10px;
+    color: #6c757d;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-secondary-custom:hover {
+    background: #f8f9fa;
+    border-color: #c0c0c0;
+    color: #495057;
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.footer-note {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e0e0e0;
+    color: #6c757d;
+    font-size: 0.9rem;
+    animation: fadeInUp 0.6s ease-out 1s both;
+}
+
+.footer-note i {
+    color: var(--primary-green);
+}
+
+/* Animations */
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes checkmark {
+    0% {
+        transform: scale(0) rotate(-45deg);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2) rotate(-45deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Confetti animation */
+.confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    background: var(--primary-green);
+    position: absolute;
+    animation: confetti-fall 3s linear infinite;
+}
+
+@keyframes confetti-fall {
+    to {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .success-header {
+        padding: 2rem 1.5rem;
+    }
+    
+    .success-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .card-content {
+        padding: 1.5rem;
+    }
+    
+    .thank-you-message {
+        font-size: 1rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .btn-primary-custom,
+    .btn-secondary-custom {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="thank-you-container">
+    <div class="thank-you-card">
+        
+        <!-- Success Header -->
+        <div class="success-header">
+            <div class="success-icon">
+                <i class="fas fa-check"></i>
+            </div>
+            <h1>Thank You!</h1>
+        </div>
+
+        <!-- Card Content -->
+        <div class="card-content">
+            
+            <div class="thank-you-message">
+                <p>Your feedback has been <span class="highlight">successfully submitted</span> and is very important to us!</p>
+                <p>We appreciate you taking the time to share your thoughts. Your input helps us improve our services and serve you better.</p>
+            </div>
+
+            <!-- Features Grid -->
+            <div class="features-grid">
+                <div class="feature-item">
+                    <i class="fas fa-chart-line"></i>
+                    <h4>We're Improving</h4>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-users"></i>
+                    <h4>User Focused</h4>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-heart"></i>
+                    <h4>We Care</h4>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="{{ url_for('visitor_feedback') }}" class="btn-secondary-custom">
+                    <i class="fas fa-comment-dots"></i>
+                    Submit Another
+                </a>
+                <a href="{{ url_for('client_home') }}" class="btn-primary-custom">
+                    <i class="fas fa-home"></i>
+                    Back to Home
+                </a>
+            </div>
+
+            <!-- Footer Note -->
+            <div class="footer-note">
+                <p><i class="fas fa-info-circle"></i> Your feedback is reviewed by our team and helps shape our future improvements.</p>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto redirect after 10 seconds (optional)
+// setTimeout(function() {
+//     window.location.href = "{{ url_for('client_home') }}";
+// }, 10000);
+
+// Add some celebratory confetti effect
+function createConfetti() {
+    const colors = ['#1cc88a', '#f6c23e', '#4e73df', '#e74a3b'];
+    for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + '%';
+            confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.animationDelay = Math.random() * 3 + 's';
+            document.body.appendChild(confetti);
+            
+            setTimeout(() => confetti.remove(), 3000);
+        }, i * 30);
+    }
+}
+
+// Trigger confetti on page load
+window.addEventListener('load', createConfetti);
+</script>
+
+</body>
+</html>

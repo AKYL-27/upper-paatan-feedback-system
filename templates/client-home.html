@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPHS Services Portal</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+<link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+<style>
+:root {
+    --primary-green: #1cc88a;
+    --dark-green: #13855c;
+    --accent-blue: #4e73df;
+}
+
+body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    position: relative;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+}
+
+.header-section {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.school-logo {
+    width: 80px;
+    height: 80px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.school-logo i {
+    font-size: 2.5rem;
+    color: var(--primary-green);
+}
+
+.header-section h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.header-section p {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    margin-bottom: 0;
+}
+
+/* Profile Card */
+.profile-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.profile-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.profile-avatar {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, var(--primary-green), var(--accent-blue));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 700;
+    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.3);
+    flex-shrink: 0;
+}
+
+.profile-info h5 {
+    margin: 0 0 0.3rem 0;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.profile-info p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.profile-badge {
+    display: inline-block;
+    background: rgba(28, 200, 138, 0.1);
+    color: var(--dark-green);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+}
+
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-actions .btn {
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.profile-actions .btn-outline-success {
+    border: 2px solid var(--primary-green);
+    color: var(--dark-green);
+    background: transparent;
+}
+
+.profile-actions .btn-outline-success:hover {
+    background: var(--primary-green);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(28, 200, 138, 0.3);
+}
+
+.profile-actions .btn-danger {
+    background: #e74a3b;
+    border: 2px solid #e74a3b;
+    color: white;
+}
+
+.profile-actions .btn-danger:hover {
+    background: #c0392b;
+    border-color: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 74, 59, 0.3);
+}
+
+/* Service Cards */
+.service-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: none;
+    height: 100%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.service-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+.service-card .card-body {
+    padding: 2.5rem 1.5rem;
+}
+
+.service-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.service-card:hover .service-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.icon-success {
+    background: linear-gradient(135deg, #1cc88a, #17a673);
+}
+
+.icon-primary {
+    background: linear-gradient(135deg, #4e73df, #2653d4);
+}
+
+.icon-warning {
+    background: linear-gradient(135deg, #f6c23e, #dda20a);
+}
+
+.service-icon i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.service-card h5 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.service-card p {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.card-link {
+    text-decoration: none;
+    display: block;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .header-section h1 {
+        font-size: 1.8rem;
+    }
+    
+    .profile-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .profile-actions {
+        margin-top: 1rem;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .profile-actions .btn {
+        flex: 1;
+    }
+    
+    .service-card .card-body {
+        padding: 2rem 1rem;
+    }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.header-section, .profile-card, .service-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.service-card:nth-child(1) { animation-delay: 0.1s; }
+.service-card:nth-child(2) { animation-delay: 0.2s; }
+.service-card:nth-child(3) { animation-delay: 0.3s; }
+</style>
+</head>
+
+<body>
+
+<div class="container py-5">
+    <!-- Header -->
+    <div class="header-section text-center text-white">
+        <div class="school-logo">
+            <i class="fas fa-graduation-cap"></i>
+        </div>
+        <h1>Upper Paatan High School</h1>
+        <p>Online Document Request & Feedback System</p>
+    </div>
+
+    <!-- Profile Card -->
+    <div class="profile-card">
+        <div class="profile-content">
+            <div class="profile-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="profile-info">
+<h5>Welcome, {{ session.get('client_user_name', 'Guest User') }}</h5>
+                <p>Access school services and track your requests</p>
+            </div>
+            <div class="profile-actions ms-auto">
+                <a href="/client/account-settings" class="btn btn-outline-success btn-sm me-2">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+                <a href="/client/login" class="btn btn-danger btn-sm">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Services Grid -->
+    <div class="row g-4">
+        <div class="col-md-4">
+            <a href="/client/request-document" class="card-link">
+                <div class="card service-card">
+                    <div class="card-body text-center">
+                        <div class="service-icon icon-success">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h5>Request Documents</h5>
+                        <p>Submit requests for transcripts, certificates, and other official documents</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-4">
+            <a href="/client/request-status" class="card-link">
+                <div class="card service-card">
+                    <div class="card-body text-center">
+                        <div class="service-icon icon-primary">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h5>Request Status</h5>
+                        <p>Monitor the status of your document requests in real-time</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-4">
+            <a href="/client/feedback" class="card-link">
+                <div class="card service-card">
+                    <div class="card-body text-center">
+                        <div class="service-icon icon-warning">
+                            <i class="fas fa-comment-dots"></i>
+                        </div>
+                        <h5>Give Feedback</h5>
+                        <p>Share your experience and help us improve our services</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

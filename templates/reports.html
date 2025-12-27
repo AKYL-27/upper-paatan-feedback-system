@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Reports | UPHS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+    <!-- Custom fonts for this template-->
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+
+    <!-- Custom styles for this template-->
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+    <style>
+        /* Override sidebar color to green */
+        .bg-gradient-primary {
+            background-color: #1cc88a;
+            background-image: linear-gradient(180deg, #1cc88a 10%, #13855c 100%);
+        }
+
+        .filter-section {
+            background: #f8f9fc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            color: #5a5c69;
+            margin-right: 10px;
+        }
+
+        .btn-filter {
+            padding: 8px 20px;
+            border-radius: 5px;
+            border: 2px solid #4e73df;
+            background: white;
+            color: #4e73df;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .btn-filter:hover {
+            background: #4e73df;
+            color: white;
+        }
+
+        .btn-filter.active {
+            background: #4e73df;
+            color: white;
+        }
+
+        .btn-filter-success {
+            border-color: #1cc88a;
+            color: #1cc88a;
+        }
+
+        .btn-filter-success:hover,
+        .btn-filter-success.active {
+            background: #1cc88a;
+            color: white;
+        }
+
+        .date-filter {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .date-input {
+            padding: 8px 12px;
+            border: 2px solid #d1d3e2;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn-apply {
+            padding: 8px 20px;
+            background: #4e73df;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-apply:hover {
+            background: #2e59d9;
+        }
+
+        .btn-reset {
+            padding: 8px 20px;
+            background: #858796;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-reset:hover {
+            background: #60616f;
+        }
+
+        .stats-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .stats-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #4e73df;
+        }
+
+        .stats-label {
+            font-size: 14px;
+            color: #858796;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+
+<body id="page-top">
+
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+            <!-- Sidebar - Brand -->
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                <div class="sidebar-brand-icon">
+                    <img src="{{url_for('static', filename='img/upper-paatan-logo3.png') }}" alt="Logo" style="width:50px; height:50px; object-fit:contain;">
+                </div>
+                <div class="sidebar-brand-text mx-3">U P H S</div>
+            </a>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider my-0">
+
+            <!-- Nav Item - Dashboard -->
+            <li class="nav-item ">
+                <a class="nav-link" href="/admin/dashboard">
+                    <i class="fas fa-fw fa-home"></i>
+                    <span>Dashboard</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <!-- Heading -->
+            <div class="sidebar-heading">
+                Interface
+            </div>
+
+            <li class="nav-item">
+                <a class="nav-link" href="document-requests">
+                    <i class="fas fa-fw fa-file"></i>
+                    <span>Document Requests</span></a>
+            </li>
+
+            <li class="nav-item ">
+                <a class="nav-link" href="feedbacks">
+                    <i class="fas fa-fw fa-comments"></i>
+                    <span>Feedback Management</span></a>
+            </li>
+
+            <li class="nav-item active">
+                <a class="nav-link" href="reports">
+                    <i class="fas fa-fw fa-copy"></i>
+                    <span>Reports</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider d-none d-md-block">
+
+            <!-- Sidebar Toggler (Sidebar) -->
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+
+            <!-- Main Content -->
+            <div id="content">
+
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+
+                    <!-- Sidebar Toggle (Topbar) -->
+                    <form class="form-inline">
+                        <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                    </form>
+
+                    <!-- Topbar Navbar -->
+                    <ul class="navbar-nav ml-auto">
+
+                        <!-- Nav Item - User Information -->
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <img class="img-profile rounded-circle" src="{{ url_for('static', filename='img/undraw_profile.svg') }}">
+                            </a>
+                            <!-- Dropdown - User Information -->
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                <a class="dropdown-item" href="/admin/profile">
+                                    <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Profile
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+
+                    </ul>
+
+                </nav>
+                <!-- End of Topbar -->
+
+                <!-- Begin Page Content -->
+                <div class="container-fluid">
+
+                    <!-- Page Heading -->
+                    <h1 class="h3 mb-4 text-gray-800">Reports & Analytics</h1>
+
+                    <!-- Filter Section for Document Requests -->
+                    <div class="filter-section">
+                        <h6 class="font-weight-bold text-primary mb-3">
+                            <i class="fas fa-filter"></i> Document Requests Filters
+                        </h6>
+                        <div class="filter-group">
+                            <span class="filter-label">Time Period:</span>
+                            <button class="btn-filter btn-filter-success active" data-filter="all" data-chart="document">All Time</button>
+                            <button class="btn-filter btn-filter-success" data-filter="today" data-chart="document">Today</button>
+                            <button class="btn-filter btn-filter-success" data-filter="week" data-chart="document">This Week</button>
+                            <button class="btn-filter btn-filter-success" data-filter="month" data-chart="document">This Month</button>
+                            <button class="btn-filter btn-filter-success" data-filter="year" data-chart="document">This Year</button>
+                        </div>
+                        <div class="filter-group mt-3">
+                            <span class="filter-label">Custom Range:</span>
+                            <div class="date-filter">
+                                <input type="date" id="docStartDate" class="date-input">
+                                <span>to</span>
+                                <input type="date" id="docEndDate" class="date-input">
+                                <button class="btn-apply" onclick="applyCustomDateFilter('document')">Apply</button>
+                                <button class="btn-reset" onclick="resetFilters('document')">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="row mb-4">
+                        <div class="col-xl-3 col-md-6">
+                            <div class="stats-card">
+                                <div class="stats-number" id="totalDocRequests">0</div>
+                                <div class="stats-label">Total Requests</div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6">
+                            <div class="stats-card">
+                                <div class="stats-number" id="totalFeedbacks">0</div>
+                                <div class="stats-label">Total Feedbacks</div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6">
+                            <div class="stats-card">
+                                <div class="stats-number" id="avgRating">0.0</div>
+                                <div class="stats-label">Average Rating</div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6">
+                            <div class="stats-card">
+                                <div class="stats-number" id="mostRequested">-</div>
+                                <div class="stats-label">Most Requested</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Content Row -->
+                    <div class="row">
+
+                        <div class="col-xl-12 col-lg-12">
+                            <!-- Bar Chart -->
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                    <h6 class="m-0 font-weight-bold text-primary">Document Requests Overview</h6>
+                                    <button class="btn btn-sm btn-primary" onclick="exportChart('documentBarChart', 'Document_Requests')">
+                                        <i class="fas fa-download"></i> Export
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-bar" style="height: 400px;">
+                                        <canvas id="documentBarChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filter Section for Feedbacks -->
+                        <div class="col-xl-12">
+                            <div class="filter-section">
+                                <h6 class="font-weight-bold text-primary mb-3">
+                                    <i class="fas fa-filter"></i> Feedback Filters
+                                </h6>
+                                <div class="filter-group">
+                                    <span class="filter-label">Time Period:</span>
+                                    <button class="btn-filter active" data-filter="all" data-chart="feedback">All Time</button>
+                                    <button class="btn-filter" data-filter="today" data-chart="feedback">Today</button>
+                                    <button class="btn-filter" data-filter="week" data-chart="feedback">This Week</button>
+                                    <button class="btn-filter" data-filter="month" data-chart="feedback">This Month</button>
+                                    <button class="btn-filter" data-filter="year" data-chart="feedback">This Year</button>
+                                </div>
+                                <div class="filter-group mt-3">
+                                    <span class="filter-label">Rating Filter:</span>
+                                    <button class="btn-filter active" data-rating="all">All Ratings</button>
+                                    <button class="btn-filter" data-rating="5">5⭐</button>
+                                    <button class="btn-filter" data-rating="4">4⭐</button>
+                                    <button class="btn-filter" data-rating="3">3⭐</button>
+                                    <button class="btn-filter" data-rating="2">2⭐</button>
+                                    <button class="btn-filter" data-rating="1">1⭐</button>
+                                </div>
+                                <div class="filter-group mt-3">
+                                    <span class="filter-label">Custom Range:</span>
+                                    <div class="date-filter">
+                                        <input type="date" id="feedbackStartDate" class="date-input">
+                                        <span>to</span>
+                                        <input type="date" id="feedbackEndDate" class="date-input">
+                                        <button class="btn-apply" onclick="applyCustomDateFilter('feedback')">Apply</button>
+                                        <button class="btn-reset" onclick="resetFilters('feedback')">Reset</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+<!-- Feedback Bar Chart -->
+                        <div class="col-xl-8 col-lg-7">
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                    <h6 class="m-0 font-weight-bold text-primary">Feedback Ratings Distribution</h6>
+                                    <button class="btn btn-sm btn-primary" onclick="exportChart('feedbackBarChart', 'Feedback_Ratings')">
+                                        <i class="fas fa-download"></i> Export
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-bar" style="height: 350px;">
+                                        <canvas id="feedbackBarChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Donut Chart -->
+                        <div class="col-xl-4 col-lg-5">
+                            <div class="card shadow mb-4">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">Rating Distribution</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-pie" style="height: 350px; display: flex; align-items: center; justify-content: center;">
+                                        <canvas id="feedbackPieChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                                        </div>
+
+                </div>
+                <!-- /.container-fluid -->
+
+            </div>
+            <!-- End of Main Content -->
+
+            <!-- Footer -->
+            <footer class="sticky-footer bg-white">
+                <div class="container my-auto">
+                    <div class="copyright text-center my-auto">
+                        <span>FEEDBACK SYSTEM UPPER PAATAN HIGH SCHOOL 2025</span>
+                    </div>
+                </div>
+            </footer>
+            <!-- End of Footer -->
+
+        </div>
+        <!-- End of Content Wrapper -->
+
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <!-- Scroll to Top Button-->
+    <a class="scroll-to-top rounded" href="#page-top">
+        <i class="fas fa-angle-up"></i>
+    </a>
+
+    <!-- Logout Modal-->
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="{{ url_for('admin_logout') }}">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap core JavaScript-->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="{{ url_for('static', filename='vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="{{ url_for('static', filename='js/sb-admin-2.min.js') }}"></script>
+
+    <!-- Page level plugins -->
+    <script src="{{ url_for('static', filename='vendor/chart.js/Chart.min.js') }}"></script>
+
+    <script>
+        // Global chart instances
+        let documentChart, feedbackBarChart, feedbackPieChart;
+        let originalDocData, originalFeedbackData;
+        let currentDocFilter = 'all';
+        let currentFeedbackFilter = 'all';
+        let currentRatingFilter = 'all';
+
+        // Initialize charts on document ready
+        $(document).ready(function() {
+            loadDocumentChart();
+            loadFeedbackCharts();
+            setupFilterListeners();
+        });
+
+        // Load Document Chart
+        function loadDocumentChart() {
+            $.getJSON("/api/reports/documents", function(data) {
+                originalDocData = data;
+                renderDocumentChart(data);
+                updateStats();
+            });
+        }
+
+        // Render Document Chart
+        function renderDocumentChart(data) {
+            const ctx = document.getElementById("documentBarChart").getContext('2d');
+            
+            if (documentChart) {
+                documentChart.destroy();
+            }
+
+            // Create gradient colors for each bar
+            const colors = data.labels.map((label, index) => {
+                const hue = (index * 360 / data.labels.length);
+                return `hsl(${hue}, 70%, 55%)`;
+            });
+
+            documentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Number of Requests',
+                        data: data.counts,
+                        backgroundColor: colors,
+                        hoverBackgroundColor: colors.map(color => {
+                            // Darken on hover
+                            return color.replace('55%', '45%');
+                        }),
+                        borderColor: colors.map(color => {
+                            return color.replace('55%', '35%');
+                        }),
+                        borderWidth: 2,
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: { size: 13 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            padding: 12,
+                            titleFont: { size: 14 },
+                            bodyFont: { size: 13 },
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1,
+                                font: { size: 12 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.08)',
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: { size: 12 },
+                                maxRotation: 45,
+                                minRotation: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load Feedback Charts
+        function loadFeedbackCharts() {
+            $.getJSON("/api/reports/feedbacks", function(data) {
+                originalFeedbackData = data;
+                renderFeedbackCharts(data);
+                updateStats();
+            });
+        }
+
+        // Render Feedback Charts
+        function renderFeedbackCharts(data) {
+            // Bar Chart
+            const barCtx = document.getElementById("feedbackBarChart").getContext('2d');
+            
+            if (feedbackBarChart) {
+                feedbackBarChart.destroy();
+            }
+
+            feedbackBarChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels.map(l => l + '⭐'),
+                    datasets: [{
+                        label: 'Number of Feedbacks',
+                        data: data.counts,
+                        backgroundColor: ['#e74a3b', '#f6c23e', '#36b9cc', '#1cc88a', '#4e73df'],
+                        hoverBackgroundColor: ['#d52a1a', '#f4b619', '#2c9faf', '#17a673', '#2e59d9'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // Pie Chart
+            const pieCtx = document.getElementById("feedbackPieChart").getContext('2d');
+            
+            if (feedbackPieChart) {
+                feedbackPieChart.destroy();
+            }
+
+            feedbackPieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels.map(l => l + '⭐'),
+                    datasets: [{
+                        data: data.counts,
+                        backgroundColor: ['#e74a3b', '#f6c23e', '#36b9cc', '#1cc88a', '#4e73df'],
+                        hoverBackgroundColor: ['#d52a1a', '#f4b619', '#2c9faf', '#17a673', '#2e59d9'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            padding: 12
+                        }
+                    }
+                }
+            });
+        }
+
+        // Setup Filter Listeners
+        function setupFilterListeners() {
+            // Time period filters
+            $('[data-filter]').click(function() {
+                const filter = $(this).data('filter');
+                const chart = $(this).data('chart');
+                
+                // Update active state
+                $(this).siblings('[data-chart="' + chart + '"]').removeClass('active');
+                $(this).addClass('active');
+                
+                if (chart === 'document') {
+                    currentDocFilter = filter;
+                    applyDocumentFilter(filter);
+                } else if (chart === 'feedback') {
+                    currentFeedbackFilter = filter;
+                    applyFeedbackFilter(filter, currentRatingFilter);
+                }
+            });
+
+            // Rating filters
+            $('[data-rating]').click(function() {
+                const rating = $(this).data('rating');
+                
+                // Update active state
+                $(this).siblings('[data-rating]').removeClass('active');
+                $(this).addClass('active');
+                
+                currentRatingFilter = rating;
+                applyFeedbackFilter(currentFeedbackFilter, rating);
+            });
+        }
+
+        // Apply Document Filter
+        function applyDocumentFilter(period) {
+            // In a real application, you would make an API call with the filter parameter
+            // For now, we'll simulate filtering
+            $.getJSON("/api/reports/documents?period=" + period, function(data) {
+                renderDocumentChart(data);
+                updateStats();
+            }).fail(function() {
+                // Fallback if API doesn't support filtering yet
+                renderDocumentChart(originalDocData);
+            });
+        }
+
+        // Apply Feedback Filter
+        function applyFeedbackFilter(period, rating) {
+            // In a real application, you would make an API call with the filter parameters
+            $.getJSON("/api/reports/feedbacks?period=" + period + "&rating=" + rating, function(data) {
+                renderFeedbackCharts(data);
+                updateStats();
+            }).fail(function() {
+                // Fallback if API doesn't support filtering yet
+                let filteredData = {...originalFeedbackData};
+                
+                if (rating !== 'all') {
+                    const ratingIndex = parseInt(rating) - 1;
+                    filteredData = {
+                        labels: [filteredData.labels[ratingIndex]],
+                        counts: [filteredData.counts[ratingIndex]]
+                    };
+                }
+                
+                renderFeedbackCharts(filteredData);
+                updateStats();
+            });
+        }
+
+        // Apply Custom Date Filter
+        function applyCustomDateFilter(chartType) {
+            if (chartType === 'document') {
+                const startDate = $('#docStartDate').val();
+                const endDate = $('#docEndDate').val();
+                
+                if (!startDate || !endDate) {
+                    alert('Please select both start and end dates');
+                    return;
+                }
+                
+                $.getJSON("/api/reports/documents?start=" + startDate + "&end=" + endDate, function(data) {
+                    renderDocumentChart(data);
+                    updateStats();
+                }).fail(function() {
+                    alert('Custom date filtering not yet implemented in API');
+                });
+            } else if (chartType === 'feedback') {
+                const startDate = $('#feedbackStartDate').val();
+                const endDate = $('#feedbackEndDate').val();
+                
+                if (!startDate || !endDate) {
+                    alert('Please select both start and end dates');
+                    return;
+                }
+                
+                $.getJSON("/api/reports/feedbacks?start=" + startDate + "&end=" + endDate, function(data) {
+                    renderFeedbackCharts(data);
+                    updateStats();
+                }).fail(function() {
+                    alert('Custom date filtering not yet implemented in API');
+                });
+            }
+        }
+
+        // Reset Filters
+        function resetFilters(chartType) {
+            if (chartType === 'document') {
+                $('#docStartDate').val('');
+                $('#docEndDate').val('');
+                $('[data-chart="document"]').removeClass('active');
+                $('[data-chart="document"][data-filter="all"]').addClass('active');
+                currentDocFilter = 'all';
+                loadDocumentChart();
+            } else if (chartType === 'feedback') {
+                $('#feedbackStartDate').val('');
+                $('#feedbackEndDate').val('');
+                $('[data-chart="feedback"]').removeClass('active');
+                $('[data-chart="feedback"][data-filter="all"]').addClass('active');
+                $('[data-rating]').removeClass('active');
+                $('[data-rating="all"]').addClass('active');
+                currentFeedbackFilter = 'all';
+                currentRatingFilter = 'all';
+                loadFeedbackCharts();
+            }
+        }
+
+        // Update Statistics
+        function updateStats() {
+            if (originalDocData && originalDocData.counts) {
+                const totalRequests = originalDocData.counts.reduce((a, b) => a + b, 0);
+                $('#totalDocRequests').text(totalRequests);
+                
+                if (originalDocData.counts.length > 0) {
+                    const maxCount = Math.max(...originalDocData.counts);
+                    const maxIndex = originalDocData.counts.indexOf(maxCount);
+                    $('#mostRequested').text(originalDocData.labels[maxIndex] || '-');
+                }
+            }
+            
+            if (originalFeedbackData && originalFeedbackData.counts) {
+                const totalFeedbacks = originalFeedbackData.counts.reduce((a, b) => a + b, 0);
+                $('#totalFeedbacks').text(totalFeedbacks);
+                
+                // Calculate average rating
+                let totalRating = 0;
+                originalFeedbackData.labels.forEach((rating, index) => {
+                    totalRating += parseInt(rating) * originalFeedbackData.counts[index];
+                });
+                const avgRating = totalFeedbacks > 0 ? (totalRating / totalFeedbacks).toFixed(1) : '0.0';
+                $('#avgRating').text(avgRating);
+            }
+        }
+
+        // Export Chart as Image
+        function exportChart(chartId, filename) {
+            const canvas = document.getElementById(chartId);
+            const url = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = filename + '_' + new Date().toISOString().split('T')[0] + '.png';
+            link.href = url;
+            link.click();
+        }
+    </script>
+
+</body>
+
+</html>

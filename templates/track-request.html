@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Track Request | UPHS</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+<link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-5">
+
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4>Track Your Document Request</h4>
+        </div>
+
+        <div class="card-body">
+
+            <form method="GET" action="/track-request">
+
+                <label>Enter Reference ID or Name</label>
+                <input class="form-control" name="search">
+
+                <button class="btn btn-primary btn-block mt-3">Search</button>
+            </form>
+
+            <hr>
+
+            {% if requests %}
+            <div class="table-responsive">
+                <table class="table table-bordered mt-3">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Document</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for r in requests %}
+                        <tr>
+                            <td>{{ r._id }}</td>
+                            <td>{{ r.document_type }}</td>
+                            <td>
+                                <span class="badge badge-info">{{ r.status }}</span>
+                            </td>
+                            <td>{{ r.date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+
+            {% else %}
+            <p class="text-center text-muted mt-3">
+                No request found yet.
+            </p>
+            {% endif %}
+
+            <div class="text-center mt-3">
+                <a href="/client/home" class="btn btn-secondary btn-sm">Back Home</a>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

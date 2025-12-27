@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Requests | UPHS Portal</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-green: #1cc88a;
+            --dark-green: #13855c;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(28, 200, 138, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-header-content h2 {
+            color: white;
+            font-weight: 600;
+            margin: 0;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .page-header-content p {
+            color: rgba(255, 255, 255, 0.9);
+            margin: 0.5rem 0 0 0;
+            font-size: 0.95rem;
+        }
+
+        .btn-new-request {
+            background: white;
+            color: var(--dark-green);
+            border: none;
+            padding: 0.65rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn-new-request:hover {
+            background: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            color: var(--dark-green);
+        }
+
+        .requests-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+            border: none;
+            overflow: hidden;
+        }
+
+        .card-body {
+            padding: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .empty-state-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #e9ecef, #dee2e6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+        }
+
+        .empty-state-icon i {
+            font-size: 3rem;
+            color: #6c757d;
+        }
+
+        .empty-state h5 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .empty-state p {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .requests-table {
+            margin: 0;
+            width: 100%;
+        }
+
+        .requests-table thead {
+            background: #f8f9fc;
+        }
+
+        .requests-table th {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            padding: 1rem 1.25rem;
+            border-bottom: 2px solid #e0e0e0;
+            white-space: nowrap;
+        }
+
+        .requests-table td {
+            padding: 1rem 1.25rem;
+            vertical-align: middle;
+            color: #495057;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .requests-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+        .requests-table tbody tr:hover {
+            background-color: #f8f9fc;
+        }
+
+        .request-id {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #6c757d;
+            background: #f8f9fc;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .document-type {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .reason-text {
+            max-width: 250px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .status-badge {
+            padding: 0.4rem 0.9rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            white-space: nowrap;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-processing {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .status-ready {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .status-released {
+            background: #e7f9f2;
+            color: var(--dark-green);
+        }
+
+        .status-rejected {
+            background: #f8d7da;
+            color: #842029;
+        }
+
+        .status-default {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .date-text {
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+
+        .filter-section {
+            padding: 1.25rem;
+            background: #f8f9fc;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-weight: 500;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .filter-select {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-select:focus {
+            border-color: var(--primary-green);
+            outline: none;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .page-header {
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .requests-card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .page-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .page-header-content h2 {
+                font-size: 1.5rem;
+            }
+
+            .btn-new-request {
+                width: 100%;
+            }
+
+            .requests-table th,
+            .requests-table td {
+                padding: 0.75rem 0.75rem;
+                font-size: 0.85rem;
+            }
+
+            .reason-text {
+                max-width: 150px;
+            }
+
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-header-content">
+            <h2>
+                <i class="fas fa-search"></i>
+                Track Your Requests
+            </h2>
+            <p>Monitor the status of your document requests in real-time</p>
+        </div>
+        <a href="/client/request-document" class="btn btn-new-request">
+            <i class="fas fa-plus me-2"></i>New Request
+        </a>
+    </div>
+
+    <!-- Requests Card -->
+    <div class="card requests-card">
+        
+        {% if requests|length > 0 %}
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <span class="filter-label">Filter by status:</span>
+            <select class="filter-select" id="statusFilter" onchange="filterTable()">
+                <option value="all">All Requests</option>
+                <option value="Pending">Pending</option>
+                <option value="Processing">Processing</option>
+                <option value="Ready">Ready for Pickup</option>
+                <option value="Released">Released</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="card-body">
+
+            {% if requests|length == 0 %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-inbox"></i>
+                    </div>
+                    <h5>No Document Requests Yet</h5>
+                    <p>You haven't submitted any document requests. Start by requesting a document below.</p>
+                    <a href="/client/request-document" class="btn btn-new-request">
+                        <i class="fas fa-plus me-2"></i>Request Your First Document
+                    </a>
+                </div>
+            {% else %}
+
+            <div class="table-responsive">
+                <table class="table requests-table" id="requestsTable">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Student Name</th>
+                            <th>Document Type</th>
+                            <th>Purpose</th>
+                            <th>Status</th>
+                            <th>Date Requested</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in requests %}
+                        <tr data-status="{{ r.status }}">
+                            <td>
+                                <span class="request-id">#{{ r._id }}</span>
+                            </td>
+                            <td>
+                                {{ r.student_name }}
+                            </td>
+
+                            <td>
+                                <span class="document-type">{{ r.document_type }}</span>
+                            </td>
+                            <td>
+                                <span class="reason-text" title="{{ r.reason }}">{{ r.reason }}</span>
+                            </td>
+                            <td>
+                                {% if r.status == "Pending" %}
+                                    <span class="status-badge status-pending">
+                                        <i class="fas fa-clock"></i> Pending
+                                    </span>
+                                {% elif r.status == "Processing" %}
+                                    <span class="status-badge status-processing">
+                                        <i class="fas fa-spinner"></i> Processing
+                                    </span>
+                                {% elif r.status == "Ready" %}
+                                    <span class="status-badge status-ready">
+                                        <i class="fas fa-check-circle"></i> Ready for Pickup
+                                    </span>
+                                {% elif r.status == "Released" %}
+                                    <span class="status-badge status-released">
+                                        <i class="fas fa-check-double"></i> Released
+                                    </span>
+                                {% elif r.status == "Rejected" %}
+                                    <span class="status-badge status-rejected">
+                                        <i class="fas fa-times-circle"></i> Rejected
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-default">
+                                        <i class="fas fa-question-circle"></i> {{ r.status }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="date-text">
+                                    <i class="far fa-calendar-alt me-1"></i>
+                                    {{ r.created_at.strftime("%B %d, %Y") if r.created_at else "N/A" }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+function filterTable() {
+    const filter = document.getElementById('statusFilter').value;
+    const table = document.getElementById('requestsTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    for (let row of rows) {
+        const status = row.getAttribute('data-status');
+        if (filter === 'all' || status === filter) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    }
+}
+</script>
+
+</body>
+</html>

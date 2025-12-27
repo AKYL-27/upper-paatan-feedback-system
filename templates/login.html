@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>UPHS - Admin Login</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+    <!-- Custom fonts for this template-->
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
+    <link
+        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
+        rel="stylesheet">
+
+    <!-- Custom styles for this template-->
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+    <style>
+        .bg-gradient-primary {
+            background-color: #1cc88a;
+            background-image: linear-gradient(180deg, #1cc88a 10%, #13855c 100%);
+        }
+        
+
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card {
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        
+        .form-control-user {
+            border-radius: 10rem;
+            padding: 1.5rem 1rem;
+        }
+        
+        .btn-user {
+            border-radius: 10rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .school-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            background: #1cc88a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+        
+        .alert {
+            border-radius: 10rem;
+            padding: 0.75rem 1.25rem;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #858796;
+        }
+        
+        .password-toggle:hover {
+            color: #4e73df;
+        }
+        
+        .form-group {
+            position: relative;
+        }
+    </style>
+
+</head>
+
+<body class="bg-gradient-primary">
+
+    <div class="container login-container">
+
+        <!-- Outer Row -->
+        <div class="row justify-content-center w-100">
+
+            <div class="col-xl-6 col-lg-8 col-md-9">
+
+                <div class="card o-hidden border-0 shadow-lg">
+                    <div class="card-body p-0">
+                        <!-- Nested Row within Card Body -->
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="p-5">
+                                    <div class="text-center">
+                                        <div class="school-logo">
+                                            <i class="fas fa-school"></i>
+                                        </div>
+                                        <h1 class="h4 text-gray-900 mb-2">Upper Paatan High School</h1>
+                                        <p class="text-muted mb-4">Admin Login Portal</p>
+                                    </div>
+
+                                    <!-- Flash Messages -->
+                                    {% with messages = get_flashed_messages(with_categories=true) %}
+                                        {% if messages %}
+                                            {% for category, message in messages %}
+                                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                                    {{ message }}
+                                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endwith %}
+
+                                    <form class="user" method="POST" action="{{ url_for('admin_login') }}" id="loginForm">
+                                        <div class="form-group">
+                                            <input type="email" 
+                                                   class="form-control form-control-user"
+                                                   id="email" 
+                                                   name="email"
+                                                   aria-describedby="emailHelp"
+                                                   placeholder="Enter Email Address..."
+                                                   required
+                                                   autocomplete="email">
+                                        </div>
+                                        <div class="form-group">
+                                            <input type="password" 
+                                                   class="form-control form-control-user"
+                                                   id="password" 
+                                                   name="password"
+                                                   placeholder="Password"
+                                                   required
+                                                   autocomplete="current-password">
+                                            <i class="fas fa-eye password-toggle" id="togglePassword"></i>
+                                        </div>
+                                        <div class="form-group">
+                                            <div class="custom-control custom-checkbox small">
+                                                <input type="checkbox" class="custom-control-input" id="rememberMe" name="remember_me">
+                                                <label class="custom-control-label" for="rememberMe">Remember Me</label>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-user btn-block" id="loginBtn">
+                                            <i class="fas fa-sign-in-alt"></i> Login
+                                        </button>
+                                        <hr>
+                                    </form>
+                                    
+                                    <!--<div class="text-center">
+                                        <a class="small text-primary" href="{{ url_for('admin_forgot_password') }}">
+                                            <i class="fas fa-lock"></i> Forgot Password?
+                                        </a>
+                                    </div>
+                                    <hr>-->
+                                    <div class="text-center">
+                                        <a class="small text-muted" href="{{ url_for('client_login') }}">
+                                            <i class="fas fa-user"></i> Client Login Portal
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-3">
+                    <p class="text-white small">© 2025 Upper Paatan High School. All Rights Reserved.</p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Bootstrap core JavaScript-->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="{{ url_for('static', filename='vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="{{ url_for('static', filename='js/sb-admin-2.min.js') }}"></script>
+
+    <script>
+        // Password toggle
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Toggle icon
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // Form validation
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                e.preventDefault();
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                e.preventDefault();
+                alert('Please enter a valid email address');
+                return;
+            }
+            
+            // Show loading state
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            loginBtn.disabled = true;
+        });
+
+        // Auto-dismiss alerts after 5 seconds
+        setTimeout(function() {
+            $('.alert').fadeOut('slow');
+        }, 5000);
+    </script>
+
+</body>
+
+</html>

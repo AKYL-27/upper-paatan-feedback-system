@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request Document | UPHS Portal</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+<link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+<style>
+:root {
+    --primary-green: #1cc88a;
+    --dark-green: #13855c;
+}
+
+body {
+    background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.2);
+}
+
+.page-header h2 {
+    color: white;
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.page-header p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0.5rem 0 0 0;
+    font-size: 0.95rem;
+}
+
+.request-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    border: none;
+    overflow: hidden;
+}
+
+.card-body {
+    padding: 2.5rem;
+}
+
+.section-title {
+    color: #2c3e50;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i {
+    color: var(--primary-green);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    color: #495057;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group label i {
+    color: var(--primary-green);
+    font-size: 0.85rem;
+}
+
+.required-mark {
+    color: #e74a3b;
+    margin-left: 0.2rem;
+}
+
+.input-wrapper {
+    position: relative;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+select.form-control {
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    appearance: auto;
+    background-color: white;
+    height: auto;
+    min-height: 45px;
+    display: flex;
+    align-items: center;
+}
+
+select.form-control:focus {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
+}
+
+select.form-control option {
+    padding: 0.5rem;
+}
+
+.info-box {
+    background: #e7f9f2;
+    border-left: 4px solid var(--primary-green);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.info-box i {
+    color: var(--primary-green);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+}
+
+.info-box-content h6 {
+    color: var(--dark-green);
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.info-box-content p {
+    color: #495057;
+    font-size: 0.85rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.btn-submit {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    border: none;
+    padding: 0.65rem 1.5rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.3);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+}
+
+.btn-back {
+    background: white;
+    border: 2px solid #e0e0e0;
+    color: #6c757d;
+    padding: 0.65rem 1.5rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+    background: #f8f9fa;
+    border-color: #c0c0c0;
+    color: #495057;
+    transform: translateY(-2px);
+}
+
+.document-options {
+    display: grid;
+    gap: 0.5rem;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-header {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.request-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column-reverse;
+    }
+    
+    .btn-submit, .btn-back {
+        width: 100%;
+    }
+}
+
+/* Character counter */
+.char-counter {
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-align: right;
+    margin-top: 0.3rem;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    
+    <!-- Page Header -->
+    <div class="page-header">
+        <h2><i class="fas fa-file-alt me-2"></i>Request School Document</h2>
+        <p>Fill out the form below to request official documents from Upper Paatan High School</p>
+    </div>
+
+    <!-- Request Form Card -->
+    <div class="card request-card">
+        <div class="card-body">
+
+            <!-- Information Box -->
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <div class="info-box-content">
+                    <h6>Processing Time</h6>
+                    <p>Document requests are typically processed within 3-5 business days. You can check the status of your request in Request Status and see when your document is ready for pickup.</p>
+                </div>
+            </div>
+
+            <form method="POST" action="/submit-request">
+
+                <!-- Personal Information Section -->
+                <div class="section-title">
+                    <i class="fas fa-user"></i>
+                    <span>Personal Information</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="fullName">
+                        <i class="fas fa-id-card"></i>
+                        Student Full Name
+                        <span class="required-mark">*</span>
+                    </label>
+                    <input type="text" id="fullName" name="name" class="form-control" placeholder="Enter your complete name" required>
+                </div>
+
+                <!-- Document Information Section -->
+                <div class="section-title">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>Document Information</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="documentType">
+                        <i class="fas fa-list"></i>
+                        Document Type
+                        <span class="required-mark">*</span>
+                    </label>
+                    <select class="form-control" id="documentType" name="document_type" required>
+                        <option value="" disabled selected>Select Document Type</option>
+                        <option value="form137">Form 137</option>
+                        <option value="4ps">4Ps Certification</option>
+                        <option value="educational_status">Educational Status Certificate</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="reason">
+                        <i class="fas fa-comment-dots"></i>
+                        Purpose/Reason for Request
+                        <span class="required-mark">*</span>
+                    </label>
+                    <textarea class="form-control" id="reason" name="reason" rows="4" placeholder="Please explain why you need this document (e.g., college application, employment, scholarship application)" maxlength="500" required></textarea>
+                    <div class="char-counter">
+                        <span id="charCount">0</span>/500 characters
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <a href="/client/home" class="btn btn-back">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Home
+                    </a>
+                    <button type="submit" class="btn btn-submit">
+                        <i class="fas fa-paper-plane me-2"></i>Submit Request
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+// Character counter for textarea
+const textarea = document.getElementById('reason');
+const charCount = document.getElementById('charCount');
+
+textarea.addEventListener('input', function() {
+    charCount.textContent = this.value.length;
+});
+</script>
+
+</body>
+</html>

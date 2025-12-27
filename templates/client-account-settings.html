@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings - UPHS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+    
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-green: #1cc88a;
+            --dark-green: #13855c;
+            --accent-blue: #4e73df;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+            font-family: 'Nunito', sans-serif;
+        }
+
+        .settings-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            transform: translateX(-5px);
+        }
+
+        .settings-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .settings-header {
+            background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+            padding: 2rem;
+            color: white;
+            text-align: center;
+        }
+
+        .settings-header h2 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .settings-header p {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .profile-section {
+            padding: 2rem;
+            border-bottom: 2px solid #e3e6f0;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-green), var(--accent-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(28, 200, 138, 0.3);
+            flex-shrink: 0;
+        }
+
+        .profile-info h4 {
+            margin: 0 0 0.3rem 0;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .profile-info p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .profile-badge {
+            display: inline-block;
+            background: rgba(28, 200, 138, 0.1);
+            color: var(--dark-green);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .settings-body {
+            padding: 2rem;
+        }
+
+        .form-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .form-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-section h5 {
+            color: var(--accent-blue);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e3e6f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #5a5c69;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control {
+            border: 2px solid #d1d3e2;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.25);
+        }
+
+        .password-toggle {
+            position: relative;
+        }
+
+        .password-input-wrapper {
+            position: relative;
+        }
+
+        .password-toggle input {
+            padding-right: 3rem !important;
+        }
+
+        .password-toggle .toggle-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #858796;
+            transition: color 0.3s;
+            z-index: 10;
+        }
+
+        .password-toggle .toggle-icon:hover {
+            color: #5a5c69;
+        }
+
+        .btn-save {
+            background: var(--primary-green);
+            color: white;
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .btn-save:hover {
+            background: var(--dark-green);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(28, 200, 138, 0.3);
+        }
+
+        .btn-cancel {
+            background: #858796;
+            color: white;
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-left: 0.75rem;
+        }
+
+        .btn-cancel:hover {
+            background: #60616f;
+        }
+
+        .alert {
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            border: none;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        @media (max-width: 768px) {
+            .profile-section {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .settings-body {
+                padding: 1.5rem;
+            }
+
+            .btn-save, .btn-cancel {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="settings-container">
+        <!-- Back Button -->
+        <a href="/client/home" class="back-button">
+            <i class="fas fa-arrow-left"></i>
+            Back to Home
+        </a>
+
+        <!-- Settings Card -->
+        <div class="settings-card">
+            <!-- Header -->
+            <div class="settings-header">
+                <h2><i class="fas fa-user-cog"></i> Account Settings</h2>
+                <p>Manage your personal information and security</p>
+            </div>
+
+            <!-- Profile Section -->
+            <div class="profile-section">
+                <div class="profile-avatar">
+                    {{ user.firstname[0].upper() }}{{ user.lastname[0].upper() }}
+                </div>
+                <div class="profile-info">
+                    <h4>{{ user.firstname }} {{ user.lastname }}</h4>
+                    <p><i class="fas fa-envelope mr-2"></i>{{ user.email }}</p>
+                    <span class="profile-badge"><i class="fas fa-graduation-cap"></i> Student Account</span>
+                </div>
+            </div>
+
+            <!-- Settings Body -->
+            <div class="settings-body">
+                <!-- Alert Messages -->
+                <div class="alert alert-success" id="successAlert" role="alert">
+                    <i class="fas fa-check-circle"></i> <span id="successMessage"></span>
+                </div>
+                <div class="alert alert-danger" id="errorAlert" role="alert">
+                    <i class="fas fa-exclamation-circle"></i> <span id="errorMessage"></span>
+                </div>
+
+                <!-- Personal Information Form -->
+                <div class="form-section">
+                    <h5><i class="fas fa-user-circle"></i> Personal Information</h5>
+                    <form id="profileForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="firstname" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="firstname" name="firstname" 
+                                       value="{{ user.firstname }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="lastname" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="lastname" name="lastname" 
+                                       value="{{ user.lastname }}" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ user.email }}" required>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn-save">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <button type="button" class="btn-cancel" onclick="resetProfileForm()">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Change Password Form -->
+                <div class="form-section">
+                    <h5><i class="fas fa-key"></i> Change Password</h5>
+                    <form id="passwordForm">
+                        <div class="mb-3">
+                            <label for="currentPassword" class="form-label">Current Password</label>
+                            <div class="password-toggle">
+                                <input type="password" class="form-control" id="currentPassword" 
+                                       name="current_password" required>
+                                <i class="fas fa-eye toggle-icon" onclick="togglePassword('currentPassword')"></i>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="newPassword" class="form-label">New Password</label>
+                                <div class="password-toggle">
+                                    <input type="password" class="form-control" id="newPassword" 
+                                           name="new_password" required minlength="6">
+                                    <i class="fas fa-eye toggle-icon" onclick="togglePassword('newPassword')"></i>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                                <div class="password-toggle">
+                                    <input type="password" class="form-control" id="confirmPassword" 
+                                           name="confirm_password" required minlength="6">
+                                    <i class="fas fa-eye toggle-icon" onclick="togglePassword('confirmPassword')"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn-save">
+                                <i class="fas fa-lock"></i> Change Password
+                            </button>
+                            <button type="button" class="btn-cancel" onclick="resetPasswordForm()">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Original values for reset
+        const originalProfile = {
+            firstname: "{{ user.firstname }}",
+            lastname: "{{ user.lastname }}",
+            email: "{{ user.email }}"
+        };
+
+        // Profile Form Submission
+        $('#profileForm').submit(function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                firstname: $('#firstname').val(),
+                lastname: $('#lastname').val(),
+                email: $('#email').val()
+            };
+
+            $.ajax({
+                url: '/api/client/profile/update',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function(response) {
+                    showSuccess(response.message);
+                    // Update original values and avatar
+                    originalProfile.firstname = formData.firstname;
+                    originalProfile.lastname = formData.lastname;
+                    originalProfile.email = formData.email;
+                    
+                    // Update avatar initials
+                    $('.profile-avatar').text(formData.firstname[0].toUpperCase() + formData.lastname[0].toUpperCase());
+                    $('.profile-info h4').text(formData.firstname + ' ' + formData.lastname);
+                    $('.profile-info p').html('<i class="fas fa-envelope mr-2"></i>' + formData.email);
+                    
+                    // Reload page after 1.5 seconds to update everything
+                    setTimeout(() => location.reload(), 1500);
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON;
+                    showError(error.message || 'Failed to update profile');
+                }
+            });
+        });
+
+        // Password Form Submission
+        $('#passwordForm').submit(function(e) {
+            e.preventDefault();
+            
+            const newPassword = $('#newPassword').val();
+            const confirmPassword = $('#confirmPassword').val();
+            
+            if (newPassword !== confirmPassword) {
+                showError('New passwords do not match');
+                return;
+            }
+
+            const formData = {
+                current_password: $('#currentPassword').val(),
+                new_password: newPassword,
+                confirm_password: confirmPassword
+            };
+
+            $.ajax({
+                url: '/api/client/profile/change-password',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function(response) {
+                    showSuccess(response.message);
+                    resetPasswordForm();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON;
+                    showError(error.message || 'Failed to change password');
+                }
+            });
+        });
+
+        // Toggle Password Visibility
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            const icon = field.nextElementSibling;
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                field.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Reset Profile Form
+        function resetProfileForm() {
+            $('#firstname').val(originalProfile.firstname);
+            $('#lastname').val(originalProfile.lastname);
+            $('#email').val(originalProfile.email);
+            hideAlerts();
+        }
+
+        // Reset Password Form
+        function resetPasswordForm() {
+            $('#passwordForm')[0].reset();
+            // Reset all password fields to password type
+            $('#currentPassword, #newPassword, #confirmPassword').attr('type', 'password');
+            $('.toggle-icon').removeClass('fa-eye-slash').addClass('fa-eye');
+            hideAlerts();
+        }
+
+        // Show Success Alert
+        function showSuccess(message) {
+            hideAlerts();
+            $('#successMessage').text(message);
+            $('#successAlert').fadeIn();
+            setTimeout(() => $('#successAlert').fadeOut(), 5000);
+            
+            // Scroll to top to show alert
+            $('html, body').animate({ scrollTop: $('.settings-body').offset().top - 20 }, 300);
+        }
+
+        // Show Error Alert
+        function showError(message) {
+            hideAlerts();
+            $('#errorMessage').text(message);
+            $('#errorAlert').fadeIn();
+            setTimeout(() => $('#errorAlert').fadeOut(), 5000);
+            
+            // Scroll to top to show alert
+            $('html, body').animate({ scrollTop: $('.settings-body').offset().top - 20 }, 300);
+        }
+
+        // Hide All Alerts
+        function hideAlerts() {
+            $('#successAlert, #errorAlert').hide();
+        }
+    </script>
+
+</body>
+</html>

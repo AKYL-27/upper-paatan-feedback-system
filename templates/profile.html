@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Profile | UPHS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+    <!-- Custom fonts for this template-->
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+
+    <!-- Custom styles for this template-->
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+    <style>
+        /* Override sidebar color to green */
+        .bg-gradient-primary {
+            background-color: #1cc88a;
+            background-image: linear-gradient(180deg, #1cc88a 10%, #13855c 100%);
+        }
+
+        .profile-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e3e6f0;
+        }
+
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            font-weight: bold;
+            margin-right: 25px;
+        }
+
+        .profile-info h3 {
+            margin: 0;
+            color: #5a5c69;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .profile-info p {
+            margin: 5px 0 0 0;
+            color: #858796;
+            font-size: 14px;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+        }
+
+        .form-section h5 {
+            color: #4e73df;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e3e6f0;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #5a5c69;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            border: 2px solid #d1d3e2;
+            border-radius: 8px;
+            padding: 12px 15px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            border-color: #1cc88a;
+            box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.25);
+        }
+
+        .btn-save {
+            background: #1cc88a;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .btn-save:hover {
+            background: #17a673;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(28, 200, 138, 0.3);
+        }
+
+        .btn-cancel {
+            background: #858796;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .btn-cancel:hover {
+            background: #60616f;
+        }
+
+        .alert {
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: none;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .password-toggle {
+            position: relative;
+        }
+
+        .password-toggle .toggle-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #858796;
+        }
+
+        .password-toggle .toggle-icon:hover {
+            color: #5a5c69;
+        }
+    </style>
+</head>
+
+<body id="page-top">
+
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+
+            <!-- Sidebar - Brand -->
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+                <div class="sidebar-brand-icon rotate-n-15">
+                    <i class="fas fa-laugh-wink"></i>
+                </div>
+                <div class="sidebar-brand-text mx-3">U P H S</div>
+            </a>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider my-0">
+
+            <!-- Nav Item - Dashboard -->
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/dashboard">
+                    <i class="fas fa-fw fa-home"></i>
+                    <span>Dashboard</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider">
+
+            <!-- Heading -->
+            <div class="sidebar-heading">
+                Interface
+            </div>
+
+            <li class="nav-item">
+                <a class="nav-link" href="document-requests">
+                    <i class="fas fa-fw fa-file"></i>
+                    <span>Document Requests</span></a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="feedbacks">
+                    <i class="fas fa-fw fa-comments"></i>
+                    <span>Feedback Management</span></a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="reports">
+                    <i class="fas fa-fw fa-copy"></i>
+                    <span>Reports</span></a>
+            </li>
+
+            <!-- Divider -->
+            <hr class="sidebar-divider d-none d-md-block">
+
+            <!-- Sidebar Toggler (Sidebar) -->
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+
+        </ul>
+        <!-- End of Sidebar -->
+
+        <!-- Content Wrapper -->
+        <div id="content-wrapper" class="d-flex flex-column">
+
+            <!-- Main Content -->
+            <div id="content">
+
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+
+                    <!-- Sidebar Toggle (Topbar) -->
+                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                        <i class="fa fa-bars"></i>
+                    </button>
+
+                    <!-- Topbar Navbar -->
+                    <ul class="navbar-nav ml-auto">
+
+                        <!-- Nav Item - User Information -->
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <img class="img-profile rounded-circle" src="{{ url_for('static', filename='img/undraw_profile.svg') }}">
+                            </a>
+                            <!-- Dropdown - User Information -->
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                <a class="dropdown-item" href="/admin/profile">
+                                    <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Profile
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+
+                    </ul>
+
+                </nav>
+                <!-- End of Topbar -->
+
+                <!-- Begin Page Content -->
+                <div class="container-fluid">
+
+                    <!-- Page Heading -->
+                    <h1 class="h3 mb-4 text-gray-800">Profile Settings</h1>
+
+                    <!-- Profile Card -->
+                    <div class="profile-card">
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                {{ user.firstname[0].upper() }}{{ user.lastname[0].upper() }}
+                            </div>
+                            <div class="profile-info">
+                                <h3>{{ user.firstname }} {{ user.lastname }}</h3>
+                                <p><i class="fas fa-envelope mr-2"></i>{{ user.email }}</p>
+                                <p><i class="fas fa-user-tag mr-2"></i>{{ user.role|title }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Alert Messages -->
+                        <div class="alert alert-success" id="successAlert" role="alert">
+                            <i class="fas fa-check-circle mr-2"></i><span id="successMessage"></span>
+                        </div>
+                        <div class="alert alert-danger" id="errorAlert" role="alert">
+                            <i class="fas fa-exclamation-circle mr-2"></i><span id="errorMessage"></span>
+                        </div>
+
+                        <!-- Personal Information Form -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-user-circle mr-2"></i>Personal Information</h5>
+                            <form id="profileForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="firstname">First Name</label>
+                                            <input type="text" class="form-control" id="firstname" name="firstname" 
+                                                   value="{{ user.firstname }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="lastname">Last Name</label>
+                                            <input type="text" class="form-control" id="lastname" name="lastname" 
+                                                   value="{{ user.lastname }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="email">Email Address</label>
+                                    <input type="email" class="form-control" id="email" name="email" 
+                                           value="{{ user.email }}" required>
+                                </div>
+                                <div class="mt-4">
+                                    <button type="submit" class="btn-save">
+                                        <i class="fas fa-save mr-2"></i>Save Changes
+                                    </button>
+                                    <button type="button" class="btn-cancel" onclick="resetProfileForm()">
+                                        <i class="fas fa-times mr-2"></i>Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Change Password Form -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-key mr-2"></i>Change Password</h5>
+                            <form id="passwordForm">
+                                <div class="form-group password-toggle">
+                                    <label for="currentPassword">Current Password</label>
+                                    <input type="password" class="form-control" id="currentPassword" 
+                                           name="current_password" required>
+                                    <i class="fas fa-eye toggle-icon" onclick="togglePassword('currentPassword')"></i>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group password-toggle">
+                                            <label for="newPassword">New Password</label>
+                                            <input type="password" class="form-control" id="newPassword" 
+                                                   name="new_password" required minlength="6">
+                                            <i class="fas fa-eye toggle-icon" onclick="togglePassword('newPassword')"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group password-toggle">
+                                            <label for="confirmPassword">Confirm New Password</label>
+                                            <input type="password" class="form-control" id="confirmPassword" 
+                                                   name="confirm_password" required minlength="6">
+                                            <i class="fas fa-eye toggle-icon" onclick="togglePassword('confirmPassword')"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <button type="submit" class="btn-save">
+                                        <i class="fas fa-lock mr-2"></i>Change Password
+                                    </button>
+                                    <button type="button" class="btn-cancel" onclick="resetPasswordForm()">
+                                        <i class="fas fa-times mr-2"></i>Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+                <!-- /.container-fluid -->
+
+            </div>
+            <!-- End of Main Content -->
+
+            <!-- Footer -->
+            <footer class="sticky-footer bg-white">
+                <div class="container my-auto">
+                    <div class="copyright text-center my-auto">
+                        <span>FEEDBACK SYSTEM UPPER PAATAN HIGH SCHOOL 2025</span>
+                    </div>
+                </div>
+            </footer>
+            <!-- End of Footer -->
+
+        </div>
+        <!-- End of Content Wrapper -->
+
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <!-- Scroll to Top Button-->
+    <a class="scroll-to-top rounded" href="#page-top">
+        <i class="fas fa-angle-up"></i>
+    </a>
+
+    <!-- Logout Modal-->
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap core JavaScript-->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="{{ url_for('static', filename='vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="{{ url_for('static', filename='js/sb-admin-2.min.js') }}"></script>
+
+    <script>
+        // Original values for reset
+        const originalProfile = {
+            firstname: "{{ user.firstname }}",
+            lastname: "{{ user.lastname }}",
+            email: "{{ user.email }}"
+        };
+
+        // Profile Form Submission
+        $('#profileForm').submit(function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                firstname: $('#firstname').val(),
+                lastname: $('#lastname').val(),
+                email: $('#email').val()
+            };
+
+            $.ajax({
+                url: '/api/profile/update',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function(response) {
+                    showSuccess(response.message);
+                    // Update original values and avatar
+                    originalProfile.firstname = formData.firstname;
+                    originalProfile.lastname = formData.lastname;
+                    originalProfile.email = formData.email;
+                    
+                    // Update avatar initials
+                    $('.profile-avatar').text(formData.firstname[0].toUpperCase() + formData.lastname[0].toUpperCase());
+                    $('.profile-info h3').text(formData.firstname + ' ' + formData.lastname);
+                    $('.profile-info p:first').html('<i class="fas fa-envelope mr-2"></i>' + formData.email);
+                    
+                    // Reload page after 1.5 seconds to update everything
+                    setTimeout(() => location.reload(), 1500);
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON;
+                    showError(error.message || 'Failed to update profile');
+                }
+            });
+        });
+
+        // Password Form Submission
+        $('#passwordForm').submit(function(e) {
+            e.preventDefault();
+            
+            const newPassword = $('#newPassword').val();
+            const confirmPassword = $('#confirmPassword').val();
+            
+            if (newPassword !== confirmPassword) {
+                showError('New passwords do not match');
+                return;
+            }
+
+            const formData = {
+                current_password: $('#currentPassword').val(),
+                new_password: newPassword,
+                confirm_password: confirmPassword
+            };
+
+            $.ajax({
+                url: '/api/profile/change-password',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function(response) {
+                    showSuccess(response.message);
+                    resetPasswordForm();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON;
+                    showError(error.message || 'Failed to change password');
+                }
+            });
+        });
+
+        // Toggle Password Visibility
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            const icon = field.nextElementSibling;
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                field.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Reset Profile Form
+        function resetProfileForm() {
+            $('#firstname').val(originalProfile.firstname);
+            $('#lastname').val(originalProfile.lastname);
+            $('#email').val(originalProfile.email);
+            hideAlerts();
+        }
+
+        // Reset Password Form
+        function resetPasswordForm() {
+            $('#passwordForm')[0].reset();
+            hideAlerts();
+        }
+
+        // Show Success Alert
+        function showSuccess(message) {
+            hideAlerts();
+            $('#successMessage').text(message);
+            $('#successAlert').fadeIn();
+            setTimeout(() => $('#successAlert').fadeOut(), 5000);
+        }
+
+        // Show Error Alert
+        function showError(message) {
+            hideAlerts();
+            $('#errorMessage').text(message);
+            $('#errorAlert').fadeIn();
+            setTimeout(() => $('#errorAlert').fadeOut(), 5000);
+        }
+
+        // Hide All Alerts
+        function hideAlerts() {
+            $('#successAlert, #errorAlert').hide();
+        }
+    </script>
+
+</body>
+
+</html>

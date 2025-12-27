@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feedback | UPHS Portal</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+<link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+<style>
+:root {
+    --primary-green: #1cc88a;
+    --dark-green: #13855c;
+    --warning-yellow: #f6c23e;
+}
+
+body {
+    background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.2);
+}
+
+.page-header h2 {
+    color: white;
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-header p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0.5rem 0 0 0;
+    font-size: 0.95rem;
+}
+
+.feedback-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    border: none;
+    overflow: hidden;
+}
+
+.card-body {
+    padding: 2.5rem;
+}
+
+.feedback-intro {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.feedback-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--warning-yellow), #e0a800);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.feedback-icon i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.feedback-intro h4 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.feedback-intro p {
+    color: #6c757d;
+    font-size: 0.95rem;
+}
+
+.form-section {
+    margin-bottom: 2rem;
+}
+
+.form-label {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    display: block;
+}
+
+.rating-options {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.rating-option {
+    position: relative;
+}
+
+.rating-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.rating-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+    min-width: 100px;
+}
+
+.rating-label:hover {
+    border-color: var(--warning-yellow);
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(246, 194, 62, 0.2);
+}
+
+.rating-option input[type="radio"]:checked + .rating-label {
+    border-color: var(--warning-yellow);
+    background: linear-gradient(135deg, rgba(246, 194, 62, 0.1), rgba(224, 168, 0, 0.1));
+    box-shadow: 0 4px 12px rgba(246, 194, 62, 0.3);
+}
+
+.rating-stars {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.rating-text {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.rating-option input[type="radio"]:checked + .rating-label .rating-text {
+    color: #e0a800;
+    font-weight: 600;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    color: #495057;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+textarea.form-control {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    resize: vertical;
+    min-height: 120px;
+}
+
+textarea.form-control:focus {
+    border-color: var(--warning-yellow);
+    box-shadow: 0 0 0 0.2rem rgba(246, 194, 62, 0.15);
+}
+
+.char-counter {
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-align: right;
+    margin-top: 0.3rem;
+}
+
+.btn-submit {
+    background: linear-gradient(135deg, var(--warning-yellow), #e0a800);
+    border: none;
+    padding: 0.65rem 2rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    color: white;
+}
+
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(246, 194, 62, 0.3);
+    color: white;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+
+.btn-back {
+    background: white;
+    border: 2px solid #e0e0e0;
+    color: #6c757d;
+    padding: 0.65rem 1.5rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+    background: #f8f9fa;
+    border-color: #c0c0c0;
+    color: #495057;
+    transform: translateY(-2px);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-header {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.feedback-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .rating-options {
+        flex-direction: column;
+    }
+    
+    .rating-label {
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column-reverse;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    
+    <!-- Page Header -->
+    <div class="page-header">
+        <h2><i class="fas fa-comment-dots"></i>Share Your Feedback</h2>
+        <p>Help us improve our services by sharing your experience</p>
+    </div>
+
+    <!-- Feedback Card -->
+    <div class="card feedback-card">
+        <div class="card-body">
+
+            <!-- Feedback Introduction -->
+            <div class="feedback-intro">
+                <div class="feedback-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <h4>How Was Your Experience?</h4>
+                <p>Your feedback helps us serve you better</p>
+            </div>
+
+            <form method="POST" action="/client/feedback">
+
+                <!-- Rating Section -->
+                <div class="form-section">
+                    <label class="form-label">Rate Our Service</label>
+                    
+                    <div class="rating-options">
+                        <div class="rating-option">
+                            <input type="radio" id="rating5" name="rating" value="5" required>
+                            <label for="rating5" class="rating-label">
+                                <span class="rating-stars">⭐⭐⭐⭐⭐</span>
+                                <span class="rating-text">Excellent</span>
+                            </label>
+                        </div>
+
+                        <div class="rating-option">
+                            <input type="radio" id="rating4" name="rating" value="4">
+                            <label for="rating4" class="rating-label">
+                                <span class="rating-stars">⭐⭐⭐⭐</span>
+                                <span class="rating-text">Good</span>
+                            </label>
+                        </div>
+
+                        <div class="rating-option">
+                            <input type="radio" id="rating3" name="rating" value="3">
+                            <label for="rating3" class="rating-label">
+                                <span class="rating-stars">⭐⭐⭐</span>
+                                <span class="rating-text">Average</span>
+                            </label>
+                        </div>
+
+                        <div class="rating-option">
+                            <input type="radio" id="rating2" name="rating" value="2">
+                            <label for="rating2" class="rating-label">
+                                <span class="rating-stars">⭐⭐</span>
+                                <span class="rating-text">Poor</span>
+                            </label>
+                        </div>
+
+                        <div class="rating-option">
+                            <input type="radio" id="rating1" name="rating" value="1">
+                            <label for="rating1" class="rating-label">
+                                <span class="rating-stars">⭐</span>
+                                <span class="rating-text">Very Poor</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Message Section -->
+                <div class="form-group">
+                    <label for="message">
+                        <i class="fas fa-pen me-2"></i>Additional Comments (Optional)
+                    </label>
+                    <textarea class="form-control" id="message" name="message" placeholder="Tell us more about your experience..." maxlength="500"></textarea>
+                    <div class="char-counter">
+                        <span id="charCount">0</span>/500 characters
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <a href="/client/home" class="btn btn-back">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Home
+                    </a>
+                    <button type="submit" class="btn btn-submit">
+                        <i class="fas fa-paper-plane me-2"></i>Submit Feedback
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+// Character counter for textarea
+const textarea = document.getElementById('message');
+const charCount = document.getElementById('charCount');
+
+textarea.addEventListener('input', function() {
+    charCount.textContent = this.value.length;
+});
+</script>
+
+</body>
+</html>

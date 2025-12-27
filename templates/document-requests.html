@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Document Requests | UPHS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+
+
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+
+    <style>
+        .bg-gradient-primary {
+            background-color: #1cc88a;
+            background-image: linear-gradient(180deg, #1cc88a 10%, #13855c 100%);
+        }
+        
+        .filter-section {
+            background: #f8f9fc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        
+        .filter-item {
+            flex: 1;
+            min-width: 180px;
+        }
+        
+        .filter-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #5a5c69;
+            font-size: 0.875rem;
+        }
+        
+        .filter-item select,
+        .filter-item input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d3e2;
+            border-radius: 5px;
+            font-size: 0.875rem;
+        }
+        
+        .btn-filter {
+            padding: 8px 20px;
+            margin-top: 5px;
+        }
+        
+        .badge-on-process {
+            background-color: #36b9cc;
+            color: white;
+        }
+        
+        .badge-ready {
+            background-color: #4e73df;
+            color: white;
+        }
+    </style>
+</head>
+
+<body id="page-top">
+    <div id="wrapper">
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                <div class="sidebar-brand-icon">
+                    <img src="{{url_for('static', filename='img/upper-paatan-logo3.png') }}" alt="Logo" style="width:50px; height:50px; object-fit:contain;">
+                </div>
+                <div class="sidebar-brand-text mx-3">U P H S</div>
+            </a>
+
+            <hr class="sidebar-divider my-0">
+
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/dashboard">
+                    <i class="fas fa-fw fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+
+            <hr class="sidebar-divider">
+
+            <div class="sidebar-heading">Interface</div>
+
+            <li class="nav-item active">
+                <a class="nav-link" href="document-requests">
+                    <i class="fas fa-fw fa-file"></i>
+                    <span>Document Requests</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="feedbacks">
+                    <i class="fas fa-fw fa-comments"></i>
+                    <span>Feedback Management</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="reports">
+                    <i class="fas fa-fw fa-copy"></i>
+                    <span>Reports</span>
+                </a>
+            </li>
+
+            <hr class="sidebar-divider d-none d-md-block">
+
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+        </ul>
+
+        <div id="content-wrapper" class="d-flex flex-column">
+            <div id="content">
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                    <form class="form-inline">
+                        <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                    </form>
+
+                    <ul class="navbar-nav ml-auto">
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <img class="img-profile rounded-circle"
+                                    src="{{ url_for('static', filename='img/undraw_profile.svg') }}">
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                <a class="dropdown-item" href="/admin/profile">
+                                    <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Profile
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+                    </ul>
+                </nav>
+
+                <!-- Page Content -->
+                <div class="container-fluid">
+                    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+                        <h1 class="h3 mb-0 text-gray-800">Document Requests</h1>
+                        <div>
+                            <button class="btn btn-success btn-sm mr-2" onclick="exportToPDF()">
+                                <i class="fas fa-file-pdf"></i> Export to PDF
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="exportToCSV()">
+                                <i class="fas fa-download"></i> Export to CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Section -->
+                    <div class="filter-section">
+                        <div class="filter-group">
+                            <div class="filter-item">
+                                <label for="filterStatus">Filter by Status</label>
+                                <select id="filterStatus" class="form-control">
+                                    <option value="">All Status</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="On Process">On Process</option>
+                                    <option value="Ready to Claim">Ready to Claim</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Declined">Declined</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="filterDocType">Document Type</label>
+                                <select id="filterDocType" class="form-control">
+                                    <option value="">All Types</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="filterDateFrom">Date From</label>
+                                <input type="date" id="filterDateFrom" class="form-control">
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="filterDateTo">Date To</label>
+                                <input type="date" id="filterDateTo" class="form-control">
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="searchText">Search</label>
+                                <input type="text" id="searchText" class="form-control" placeholder="Search by name...">
+                            </div>
+                            
+                            <div>
+                                <button class="btn btn-primary btn-filter" onclick="applyFilters()">
+                                    <i class="fas fa-filter"></i> Apply
+                                </button>
+                                <button class="btn btn-secondary btn-filter" onclick="clearFilters()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DataTable -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">All Document Requests</h6>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Requester</th>
+                                            <th>Student Name</th>
+                                            <th>Document Type</th>
+                                            <th>Reason</th>
+                                            <th>Status</th>
+                                            <th>Date Requested</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requestTableBody">
+                                        <tr>
+                                            <td colspan="8" class="text-center">Loading...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="sticky-footer bg-white">
+                <div class="container my-auto">
+                    <div class="copyright text-center my-auto">
+                        <span>FEEDBACK SYSTEM UPPER PAATAN HIGH SCHOOL 2025</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Scroll to Top -->
+    <a class="scroll-to-top rounded" href="#page-top">
+        <i class="fas fa-angle-up"></i>
+    </a>
+
+    <!-- Logout Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="/admin/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sb-admin-2.min.js') }}"></script>
+
+    <!-- jsPDF and jsPDF-AutoTable for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+    let allRequestsData = [];
+    let filteredData = [];
+
+    $(document).ready(function() {
+        loadRequests();
+    });
+
+    function loadRequests() {
+        $.getJSON("{{ url_for('api_list_requests') }}", function(data) {
+            allRequestsData = data;
+            filteredData = data;
+            populateDocTypeFilter();
+            renderTable();
+        }).fail(function() {
+            $("#requestTableBody").html('<tr><td colspan="8" class="text-center text-danger">Error loading data</td></tr>');
+        });
+    }
+
+    function populateDocTypeFilter() {
+        const docTypes = [...new Set(allRequestsData.map(req => req.document_type_name))];
+        const select = $('#filterDocType');
+        select.find('option:not(:first)').remove();
+        docTypes.forEach(type => {
+            select.append(`<option value="${type}">${type}</option>`);
+        });
+    }
+
+    function renderTable() {
+        let tbody = $("#requestTableBody");
+        tbody.empty();
+
+        if (!filteredData.length) {
+            tbody.append('<tr><td colspan="8" class="text-center">No requests available</td></tr>');
+            return;
+        }
+
+        filteredData.forEach(function(req, index) {
+            // Status badge
+            let statusBadge = '';
+            switch(req.status) {
+                case "Pending":
+                    statusBadge = '<span class="badge badge-warning">Pending</span>';
+                    break;
+                case "On Process":
+                    statusBadge = '<span class="badge badge-on-process">On Process</span>';
+                    break;
+                case "Ready to Claim":
+                    statusBadge = '<span class="badge badge-ready">Ready to Claim</span>';
+                    break;
+                case "Completed":
+                    statusBadge = '<span class="badge badge-success">Completed</span>';
+                    break;
+                case "Declined":
+                    statusBadge = '<span class="badge badge-danger">Declined</span>';
+                    break;
+                default:
+                    statusBadge = `<span class="badge badge-secondary">${req.status}</span>`;
+            }
+
+            // Action buttons based on status
+            let actionButtons = '';
+            switch(req.status) {
+                case "Pending":
+                    actionButtons = `
+                        <button class="btn btn-success btn-sm" onclick="updateRequest('${req._id}', 'approve')">
+                            <i class="fas fa-check"></i> Approve
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="updateRequest('${req._id}', 'decline')">
+                            <i class="fas fa-times"></i> Decline
+                        </button>`;
+                    break;
+                case "On Process":
+                    actionButtons = `
+                        <button class="btn btn-primary btn-sm" onclick="updateRequest('${req._id}', 'ready')">
+                            <i class="fas fa-clipboard-check"></i> Ready
+                        </button>`;
+                    break;
+                case "Ready to Claim":
+                    actionButtons = `
+                        <button class="btn btn-success btn-sm" onclick="updateRequest('${req._id}', 'complete')">
+                            <i class="fas fa-check-double"></i> Complete
+                        </button>`;
+                    break;
+                default:
+                    actionButtons = `<span class="text-muted">No actions</span>`;
+            }
+
+            tbody.append(`
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${req.user_name}</td>
+                    <td>${req.student_name}</td>
+                    <td>${req.document_type_name}</td>
+                    <td>${req.reason.substring(0, 40)}${req.reason.length > 40 ? '...' : ''}</td>
+                    <td>${statusBadge}</td>
+                    <td>${req.request_date_formatted}</td>
+                    <td>${actionButtons}</td>
+                </tr>
+            `);
+        });
+    }
+
+    function updateRequest(requestId, action) {
+        let confirmMessages = {
+            'approve': 'Are you sure you want to approve this request? Status will change to "On Process".',
+            'decline': 'Are you sure you want to decline this request?',
+            'ready': 'Mark this document as ready to claim?',
+            'complete': 'Mark this request as completed?'
+        };
+
+        if (confirm(confirmMessages[action])) {
+            $.ajax({
+                url: `/api/request/update/${requestId}`,
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ action: action }),
+                success: function(resp) {
+                    if(resp.success) {
+                        let successMessages = {
+                            'approve': 'Request approved! Status changed to "On Process".',
+                            'decline': 'Request declined.',
+                            'ready': 'Document marked as ready to claim!',
+                            'complete': 'Request completed successfully!'
+                        };
+                        alert(successMessages[action]);
+                        loadRequests();
+                    }
+                },
+                error: function() {
+                    alert("Failed to update request.");
+                }
+            });
+        }
+    }
+
+    function applyFilters() {
+        const status = $('#filterStatus').val();
+        const docType = $('#filterDocType').val();
+        const dateFrom = $('#filterDateFrom').val();
+        const dateTo = $('#filterDateTo').val();
+        const searchText = $('#searchText').val().toLowerCase();
+
+        filteredData = allRequestsData.filter(req => {
+            if (status && req.status !== status) return false;
+            if (docType && req.document_type_name !== docType) return false;
+            
+            if (dateFrom || dateTo) {
+                const reqDate = new Date(req.request_date_formatted);
+                if (dateFrom && reqDate < new Date(dateFrom)) return false;
+                if (dateTo && reqDate > new Date(dateTo + 'T23:59:59')) return false;
+            }
+            
+            if (searchText) {
+                const requesterMatch = req.user_name.toLowerCase().includes(searchText);
+                const studentMatch = req.student_name.toLowerCase().includes(searchText);
+                const reasonMatch = req.reason.toLowerCase().includes(searchText);
+                if (!requesterMatch && !studentMatch && !reasonMatch) return false;
+            }
+            
+            return true;
+        });
+
+        renderTable();
+    }
+
+    function clearFilters() {
+        $('#filterStatus').val('');
+        $('#filterDocType').val('');
+        $('#filterDateFrom').val('');
+        $('#filterDateTo').val('');
+        $('#searchText').val('');
+        filteredData = allRequestsData;
+        renderTable();
+    }
+
+    function exportToCSV() {
+        const headers = ['#', 'Requester', 'Student Name', 'Document Type', 'Reason', 'Status', 'Date Requested'];
+        const rows = filteredData.map((req, i) => [
+            i + 1,
+            req.user_name,
+            req.student_name,
+            req.document_type_name,
+            req.reason.replace(/,/g, ';'),
+            req.status,
+            req.request_date_formatted
+        ]);
+
+        let csv = headers.join(',') + '\n';
+        rows.forEach(row => {
+            csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Document_Requests_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+        
+        // Add title
+        doc.setFontSize(18);
+        doc.setTextColor(40);
+        doc.text('Document Requests Report', 14, 22);
+        
+        // Add subtitle with date
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        })}`, 14, 30);
+        
+        // Add summary statistics
+        if (filteredData.length > 0) {
+            const statusCounts = filteredData.reduce((acc, req) => {
+                acc[req.status] = (acc[req.status] || 0) + 1;
+                return acc;
+            }, {});
+            
+            let summaryText = `Total Requests: ${filteredData.length}`;
+            const statusTexts = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`);
+            if (statusTexts.length > 0) {
+                summaryText += ' | ' + statusTexts.join(' | ');
+            }
+            
+            doc.setFontSize(10);
+            doc.text(summaryText, 14, 37);
+        }
+        
+        // Prepare table data
+        const tableData = filteredData.map((req, index) => [
+            index + 1,
+            req.user_name,
+            req.student_name,
+            req.document_type_name,
+            req.reason.length > 60 ? req.reason.substring(0, 60) + '...' : req.reason,
+            req.status,
+            req.request_date_formatted
+        ]);
+        
+        // Generate table
+        doc.autoTable({
+            head: [['#', 'Requester', 'Student Name', 'Document Type', 'Reason', 'Status', 'Date']],
+            body: tableData,
+            startY: 45,
+            theme: 'striped',
+            headStyles: {
+                fillColor: [28, 200, 138], // Green color matching your theme
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            styles: {
+                fontSize: 9,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { cellWidth: 10, halign: 'center' },
+                1: { cellWidth: 35 },
+                2: { cellWidth: 35 },
+                3: { cellWidth: 40 },
+                4: { cellWidth: 70 },
+                5: { cellWidth: 30, halign: 'center' },
+                6: { cellWidth: 30, halign: 'center' }
+            },
+            margin: { top: 45, left: 14, right: 14 },
+            didDrawPage: function(data) {
+                // Footer
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(
+                    'Upper Paatan High School - Document Request Management System',
+                    data.settings.margin.left,
+                    doc.internal.pageSize.height - 10
+                );
+                doc.text(
+                    `Page ${doc.internal.getNumberOfPages()}`,
+                    doc.internal.pageSize.width - 30,
+                    doc.internal.pageSize.height - 10
+                );
+            }
+        });
+        
+        // Save the PDF
+        doc.save(`UPHS_Document_Requests_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+    </script>
+</body>
+</html>
