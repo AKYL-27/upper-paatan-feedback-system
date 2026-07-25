@@ -330,6 +330,10 @@ def admin_reports():
     return render_template("reports.html")
 
 
+@app.route("/admin/students")
+def admin_students():
+    """Admin page listing all students (users with role 'client')."""
+    return render_template("students.html")
 
 
 # -----------------------------
@@ -435,6 +439,24 @@ def api_list_feedbacks():
             "comments": fb.get("comments", ""),
             "status": fb.get("status", "New"),
             "date_submitted": formatted_date
+        })
+
+    return jsonify(result)
+
+
+@app.route("/api/list-students")
+def api_list_students():
+    """Return all users with role 'client' (students)."""
+    students = list(users_collection.find({"role": "client"}))
+    result = []
+
+    for s in students:
+        result.append({
+            "_id": str(s["_id"]),
+            "firstname": s.get("firstname", ""),
+            "lastname": s.get("lastname", ""),
+            "full_name": f"{s.get('firstname','')} {s.get('lastname','')}".strip(),
+            "email": s.get("email", "N/A"),
         })
 
     return jsonify(result)

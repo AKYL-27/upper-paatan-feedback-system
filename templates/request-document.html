@@ -22,6 +22,11 @@ body {
     padding: 2rem 0;
 }
 
+.top-nav {
+    margin-bottom: 1rem;
+    animation: fadeInUp 0.4s ease-out;
+}
+
 .page-header {
     background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
     padding: 2rem;
@@ -203,6 +208,8 @@ select.form-control option {
     font-size: 0.95rem;
     border-radius: 8px;
     transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
 }
 
 .btn-back:hover {
@@ -253,9 +260,10 @@ select.form-control option {
     
     .action-buttons {
         flex-direction: column-reverse;
+        justify-content: flex-end;
     }
     
-    .btn-submit, .btn-back {
+    .btn-submit {
         width: 100%;
     }
 }
@@ -273,7 +281,14 @@ select.form-control option {
 <body>
 
 <div class="container">
-    
+
+    <!-- Top Navigation -->
+    <div class="top-nav">
+        <a href="/client/home" class="btn btn-back">
+            <i class="fas fa-arrow-left me-2"></i>Back to Home
+        </a>
+    </div>
+
     <!-- Page Header -->
     <div class="page-header">
         <h2><i class="fas fa-file-alt me-2"></i>Request School Document</h2>
@@ -324,9 +339,8 @@ select.form-control option {
                     </label>
                     <select class="form-control" id="documentType" name="document_type" required>
                         <option value="" disabled selected>Select Document Type</option>
-                        <option value="form137">Form 137</option>
-                        <option value="4ps">4Ps Certification</option>
-                        <option value="educational_status">Educational Status Certificate</option>
+                        <option value="certification">CERTIFICATION</option>
+                        <option value="diploma">DIPLOMA</option>
                     </select>
                 </div>
 
@@ -344,9 +358,6 @@ select.form-control option {
 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <a href="/client/home" class="btn btn-back">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Home
-                    </a>
                     <button type="submit" class="btn btn-submit">
                         <i class="fas fa-paper-plane me-2"></i>Submit Request
                     </button>

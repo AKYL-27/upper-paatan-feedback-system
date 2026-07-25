@@ -22,6 +22,31 @@
             padding: 2rem 0;
         }
 
+        .top-nav {
+            margin-bottom: 1rem;
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        .btn-back {
+            background: white;
+            border: 2px solid #e0e0e0;
+            color: #6c757d;
+            padding: 0.65rem 1.5rem;
+            font-weight: 500;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .btn-back:hover {
+            background: #f8f9fa;
+            border-color: #c0c0c0;
+            color: #495057;
+            transform: translateY(-2px);
+        }
+
         .page-header {
             background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
             padding: 2rem;
@@ -309,7 +334,14 @@
 <body>
 
 <div class="container">
-    
+
+    <!-- Top Navigation -->
+    <div class="top-nav">
+        <a href="/client/home" class="btn btn-back">
+            <i class="fas fa-arrow-left me-2"></i>Back to Home
+        </a>
+    </div>
+
     <!-- Page Header -->
     <div class="page-header">
         <div class="page-header-content">
