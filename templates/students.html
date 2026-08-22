@@ -102,6 +102,23 @@
             font-weight: bold;
             color: #5a5c69;
         }
+
+        .badge-registered {
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge-registered.yes {
+            background-color: #d1f7e8;
+            color: #13855c;
+        }
+
+        .badge-registered.no {
+            background-color: #fbe2e2;
+            color: #a12727;
+        }
     </style>
 
 </head>
@@ -161,7 +178,7 @@
             <li class="nav-item active">
                 <a class="nav-link" href="students">
                     <i class="fas fa-fw fa-user-graduate"></i>
-                    <span>Registered Students</span></a>
+                    <span>Master List</span></a>
             </li>
 
             <!-- Divider -->
@@ -254,7 +271,7 @@
 
                     <!-- Page Heading -->
                     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-                        <h1 class="h3 mb-0 text-gray-800">Registered Students</h1>
+                        <h1 class="h3 mb-0 text-gray-800">Master List</h1>
                         <div>
                             <button class="btn btn-primary btn-sm" onclick="exportToCSV()">
                                 <i class="fas fa-download"></i> Export to CSV
@@ -268,6 +285,29 @@
                             <div class="filter-item">
                                 <label for="searchText">Search</label>
                                 <input type="text" id="searchText" class="form-control" placeholder="Search by name or email...">
+                            </div>
+
+                            <div class="filter-item">
+                                <label for="filterYear">Year</label>
+                                <select id="filterYear" class="form-control">
+                                    <option value="">All Years</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-item">
+                                <label for="filterSection">Section</label>
+                                <select id="filterSection" class="form-control">
+                                    <option value="">All Sections</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-item">
+                                <label for="filterRegistration">Registration Status</label>
+                                <select id="filterRegistration" class="form-control">
+                                    <option value="">All</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
                             </div>
 
                             <div>
@@ -284,7 +324,7 @@
                     <!-- Students List -->
                     <div class="card shadow mb-4">
                         <div class="card-header py-3">
-                            <h6 class="m-0 font-weight-bold text-primary">Students List</h6>
+                            <h6 class="m-0 font-weight-bold text-primary">Master List</h6>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -294,11 +334,13 @@
                                             <th>#</th>
                                             <th>Full Name</th>
                                             <th>Email Address</th>
+                                            <th>Year &amp; Section</th>
+                                            <th>Registration Status</th>
                                         </tr>
                                     </thead>
                                     <tbody id="studentsTableBody">
                                         <tr>
-                                            <td colspan="3" class="text-center">Loading...</td>
+                                            <td colspan="5" class="text-center">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -376,12 +418,56 @@ function loadStudents() {
     $.getJSON("/api/list-students", function (data) {
         allStudentsData = data;
         filteredStudentsData = data;
+        populateFilterOptions(data);
         renderStudentsTable(filteredStudentsData);
     }).fail(function () {
         $("#studentsTableBody").html(
-            '<tr><td colspan="3" class="text-center text-danger">Failed to load students</td></tr>'
+            '<tr><td colspan="5" class="text-center text-danger">Failed to load students</td></tr>'
         );
     });
+}
+
+// Normalizes whatever the API sends (true/false, 1/0, "yes"/"no", "registered", etc.)
+// into a plain "Yes" / "No" string.
+function getRegistrationStatus(s) {
+    const raw = s.registration_status !== undefined ? s.registration_status : s.is_registered;
+
+    if (typeof raw === 'boolean') {
+        return raw ? 'Yes' : 'No';
+    }
+    if (typeof raw === 'number') {
+        return raw === 1 ? 'Yes' : 'No';
+    }
+    if (typeof raw === 'string') {
+        const val = raw.trim().toLowerCase();
+        return (val === 'yes' || val === 'true' || val === '1' || val === 'registered') ? 'Yes' : 'No';
+    }
+    return 'No';
+}
+
+// Combines year + section into a single display string, e.g. "Grade 8 - Sampaguita".
+function getYearSection(s) {
+    const year = (s.year || '').toString().trim();
+    const section = (s.section || '').toString().trim();
+
+    if (year && section) return `${year} - ${section}`;
+    if (year) return year;
+    if (section) return section;
+    return 'N/A';
+}
+
+function populateFilterOptions(students) {
+    const years = [...new Set(students.map(s => s.year).filter(Boolean))].sort();
+    const sections = [...new Set(students.map(s => s.section).filter(Boolean))].sort();
+
+    const $yearSelect = $('#filterYear');
+    const $sectionSelect = $('#filterSection');
+
+    $yearSelect.find('option:not(:first)').remove();
+    $sectionSelect.find('option:not(:first)').remove();
+
+    years.forEach(y => $yearSelect.append(`<option value="${y}">${y}</option>`));
+    sections.forEach(sec => $sectionSelect.append(`<option value="${sec}">${sec}</option>`));
 }
 
 function renderStudentsTable(students) {
@@ -389,16 +475,21 @@ function renderStudentsTable(students) {
     tbody.empty();
 
     if (!students.length) {
-        tbody.append('<tr><td colspan="3" class="text-center">No students found</td></tr>');
+        tbody.append('<tr><td colspan="5" class="text-center">No students found</td></tr>');
         return;
     }
 
     students.forEach((s, index) => {
+        const status = getRegistrationStatus(s);
+        const badgeClass = status === 'Yes' ? 'yes' : 'no';
+
         tbody.append(`
         <tr>
             <td>${index + 1}</td>
             <td>${s.full_name}</td>
             <td>${s.email}</td>
+            <td>${getYearSection(s)}</td>
+            <td><span class="badge-registered ${badgeClass}">${status}</span></td>
         </tr>
         `);
     });
@@ -406,6 +497,9 @@ function renderStudentsTable(students) {
 
 function applyFilters() {
     const searchText = $('#searchText').val().toLowerCase();
+    const yearFilter = $('#filterYear').val();
+    const sectionFilter = $('#filterSection').val();
+    const registrationFilter = $('#filterRegistration').val();
 
     filteredStudentsData = allStudentsData.filter(s => {
         if (searchText) {
@@ -413,6 +507,10 @@ function applyFilters() {
             const emailMatch = s.email.toLowerCase().includes(searchText);
             if (!nameMatch && !emailMatch) return false;
         }
+        if (yearFilter && String(s.year) !== String(yearFilter)) return false;
+        if (sectionFilter && String(s.section) !== String(sectionFilter)) return false;
+        if (registrationFilter && getRegistrationStatus(s) !== registrationFilter) return false;
+
         return true;
     });
 
@@ -421,16 +519,21 @@ function applyFilters() {
 
 function clearFilters() {
     $('#searchText').val('');
+    $('#filterYear').val('');
+    $('#filterSection').val('');
+    $('#filterRegistration').val('');
     filteredStudentsData = allStudentsData;
     renderStudentsTable(filteredStudentsData);
 }
 
 function exportToCSV() {
-    const headers = ['#', 'Full Name', 'Email Address'];
+    const headers = ['#', 'Full Name', 'Email Address', 'Year & Section', 'Registration Status'];
     const rows = filteredStudentsData.map((s, i) => [
         i + 1,
         s.full_name,
-        s.email
+        s.email,
+        getYearSection(s),
+        getRegistrationStatus(s)
     ]);
 
     let csv = headers.join(',') + '\n';
