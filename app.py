@@ -457,6 +457,10 @@ def api_list_students():
             "lastname": s.get("lastname", ""),
             "full_name": f"{s.get('firstname','')} {s.get('lastname','')}".strip(),
             "email": s.get("email", "N/A"),
+            "year": s.get("year", "N/A"),
+            "section": s.get("section", "N/A"),
+            # Anyone who has an account in the system is considered registered.
+            "registration_status": "Yes",
         })
 
     return jsonify(result)
@@ -680,9 +684,20 @@ def client_register():
         last_name = request.form.get("last_name", "").strip()
         email = request.form.get("email", "").lower().strip()
         password = request.form.get("password")
+        year = request.form.get("year", "").strip()
+        section = request.form.get("section", "").strip()
+
+        # DEBUG: confirm what the server actually received from the form
+        print("DEBUG - form data received:", {
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": email,
+            "year": year,
+            "section": section
+        })
 
         # basic validation
-        if not first_name or not last_name or not email or not password:
+        if not first_name or not last_name or not email or not password or not year or not section:
             flash("All fields are required.", "danger")
             return redirect(url_for("client_register"))
 
@@ -698,7 +713,9 @@ def client_register():
             "lastname": last_name,
             "email": email,
             "password": hashed,
-            "role": "client"
+            "role": "client",
+            "year": year,
+            "section": section
         })
 
         flash("Account created successfully. Please login.", "success")
@@ -754,6 +771,10 @@ def update_client_profile():
         update_data["lastname"] = data["lastname"]
     if new_email:
         update_data["email"] = new_email
+    if data.get("year"):
+        update_data["year"] = data["year"]
+    if data.get("section"):
+        update_data["section"] = data["section"]
     
     # Update user
     users_collection.update_one(
