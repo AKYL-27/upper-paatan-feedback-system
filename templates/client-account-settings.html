@@ -178,6 +178,16 @@
             box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.25);
         }
 
+        select.form-control {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 16px;
+        }
+
         .password-toggle {
             position: relative;
         }
@@ -346,6 +356,25 @@
                             <input type="email" class="form-control" id="email" name="email" 
                                    value="{{ user.email }}" required>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="year" class="form-label">Year Level</label>
+                                <select class="form-control" id="year" name="year" required>
+                                    <option value="" disabled>Select year</option>
+                                    <option value="Grade 7" {% if user.year == "Grade 7" %}selected{% endif %}>Grade 7</option>
+                                    <option value="Grade 8" {% if user.year == "Grade 8" %}selected{% endif %}>Grade 8</option>
+                                    <option value="Grade 9" {% if user.year == "Grade 9" %}selected{% endif %}>Grade 9</option>
+                                    <option value="Grade 10" {% if user.year == "Grade 10" %}selected{% endif %}>Grade 10</option>
+                                    <option value="Grade 11" {% if user.year == "Grade 11" %}selected{% endif %}>Grade 11</option>
+                                    <option value="Grade 12" {% if user.year == "Grade 12" %}selected{% endif %}>Grade 12</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="section" class="form-label">Section</label>
+                                <input type="text" class="form-control" id="section" name="section" 
+                                       value="{{ user.section }}" placeholder="e.g. Sampaguita" required>
+                            </div>
+                        </div>
                         <div class="mt-4">
                             <button type="submit" class="btn-save">
                                 <i class="fas fa-save"></i> Save Changes
@@ -409,7 +438,9 @@
         const originalProfile = {
             firstname: "{{ user.firstname }}",
             lastname: "{{ user.lastname }}",
-            email: "{{ user.email }}"
+            email: "{{ user.email }}",
+            year: "{{ user.year }}",
+            section: "{{ user.section }}"
         };
 
         // Profile Form Submission
@@ -419,7 +450,9 @@
             const formData = {
                 firstname: $('#firstname').val(),
                 lastname: $('#lastname').val(),
-                email: $('#email').val()
+                email: $('#email').val(),
+                year: $('#year').val(),
+                section: $('#section').val()
             };
 
             $.ajax({
@@ -433,6 +466,8 @@
                     originalProfile.firstname = formData.firstname;
                     originalProfile.lastname = formData.lastname;
                     originalProfile.email = formData.email;
+                    originalProfile.year = formData.year;
+                    originalProfile.section = formData.section;
                     
                     // Update avatar initials
                     $('.profile-avatar').text(formData.firstname[0].toUpperCase() + formData.lastname[0].toUpperCase());
@@ -504,6 +539,8 @@
             $('#firstname').val(originalProfile.firstname);
             $('#lastname').val(originalProfile.lastname);
             $('#email').val(originalProfile.email);
+            $('#year').val(originalProfile.year);
+            $('#section').val(originalProfile.section);
             hideAlerts();
         }
 
