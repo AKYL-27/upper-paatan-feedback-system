@@ -9,7 +9,7 @@
     <meta name="description" content="">
     <meta name="author" content="">
 
-    <title>Students List | UPHS</title>
+    <title>Masters List | UPHS</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
 
     <!-- Custom fonts for this template-->
@@ -118,6 +118,11 @@
         .badge-registered.no {
             background-color: #fbe2e2;
             color: #a12727;
+        }
+
+        #importPreviewSection {
+            max-height: 420px;
+            overflow-y: auto;
         }
     </style>
 
@@ -273,6 +278,9 @@
                     <div class="d-sm-flex align-items-center justify-content-between mb-4">
                         <h1 class="h3 mb-0 text-gray-800">Master List</h1>
                         <div>
+                            <button class="btn btn-success btn-sm" data-toggle="modal" data-target="#importModal">
+                                <i class="fas fa-upload"></i> Import
+                            </button>
                             <button class="btn btn-primary btn-sm" onclick="exportToCSV()">
                                 <i class="fas fa-download"></i> Export to CSV
                             </button>
@@ -323,8 +331,9 @@
 
                     <!-- Students List -->
                     <div class="card shadow mb-4">
-                        <div class="card-header py-3">
+                        <div class="card-header py-3 d-flex align-items-center justify-content-between">
                             <h6 class="m-0 font-weight-bold text-primary">Master List</h6>
+                            <span id="importedBadge" class="badge badge-info" style="display:none;">Includes imported roster</span>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -332,7 +341,8 @@
                                     <thead>
                                         <tr>
                                             <th>#</th>
-                                            <th>Full Name</th>
+                                            <th>First Name</th>
+                                            <th>Last Name</th>
                                             <th>Email Address</th>
                                             <th>Year &amp; Section</th>
                                             <th>Registration Status</th>
@@ -340,7 +350,7 @@
                                     </thead>
                                     <tbody id="studentsTableBody">
                                         <tr>
-                                            <td colspan="5" class="text-center">Loading...</td>
+                                            <td colspan="6" class="text-center">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -395,6 +405,87 @@
         </div>
     </div>
 
+    <!-- Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1" role="dialog" aria-labelledby="importModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importModalLabel">Import Master List</h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Upload a CSV or Excel (.xlsx/.xls) file containing student details.
+                        Expected columns: <strong>First Name</strong>, <strong>Last Name</strong>
+                        (or a single <strong>Full Name</strong> column), <strong>Email</strong>,
+                        <strong>Year</strong>, <strong>Section</strong>.
+                    </p>
+                    <p class="text-muted" style="font-size: 0.85rem;">
+                        Each row will be checked against the existing database (matched by email, or by full
+                        name if no email match is found). Students found in the database will be marked
+                        <span class="badge-registered yes">Yes</span>, and students not found will be marked
+                        <span class="badge-registered no">No</span>.
+                    </p>
+
+                    <div class="form-group">
+                        <input type="file" id="importFileInput" class="form-control-file" accept=".csv,.xlsx,.xls">
+                    </div>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadSampleTemplate()">
+                        <i class="fas fa-file-download"></i> Download Sample Template
+                    </button>
+
+                    <div id="importError" class="alert alert-danger mt-3" style="display:none;"></div>
+
+                    <div id="importPreviewSection" style="display:none; margin-top:20px;">
+                        <hr>
+                        <div class="stats-summary">
+                            <div class="stat-card info">
+                                <h6>Total Rows</h6>
+                                <div class="value" id="totalCount">0</div>
+                            </div>
+                            <div class="stat-card success">
+                                <h6>Registered (Yes)</h6>
+                                <div class="value" id="matchedCount">0</div>
+                            </div>
+                            <div class="stat-card warning">
+                                <h6>Not Registered (No)</h6>
+                                <div class="value" id="unmatchedCount">0</div>
+                            </div>
+                        </div>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>First Name</th>
+                                        <th>Last Name</th>
+                                        <th>Email</th>
+                                        <th>Year &amp; Section</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="importPreviewBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <button class="btn btn-info" type="button" id="previewImportBtn" onclick="previewImport()">
+                        <i class="fas fa-eye"></i> Preview
+                    </button>
+                    <button class="btn btn-success" type="button" id="confirmImportBtn" onclick="confirmImport()" style="display:none;">
+                        <i class="fas fa-check"></i> Confirm Import
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <!-- Bootstrap core JavaScript-->
@@ -403,6 +494,9 @@
     <!-- Core plugin JavaScript-->
     <script src="{{ url_for('static', filename='vendor/jquery-easing/jquery.easing.min.js') }}"></script>
 
+    <!-- SheetJS (for parsing CSV / Excel imports) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <!-- Custom scripts for all pages-->
     <script src="{{ url_for('static', filename='js/sb-admin-2.min.js') }}"></script>
 
@@ -410,19 +504,48 @@
 let allStudentsData = [];
 let filteredStudentsData = [];
 
+// The list loaded from the database (/api/list-students). This is the
+// "source of truth" that imported rows get validated against, regardless
+// of whether the table is currently showing the DB list or an imported list.
+let registeredStudentsDb = [];
+
+// Holds the parsed+validated rows from the currently loaded import file,
+// before the user confirms and applies them to the table.
+let importedPreviewData = [];
+
 $(document).ready(function () {
+    loadRegisteredAccounts();
     loadStudents();
+
+    $('#importModal').on('hidden.bs.modal', resetImportModal);
 });
 
+// Loads the real, always-authoritative list of registered client accounts.
+// Used only to validate a newly-uploaded file in the import preview -
+// independent of whatever the Master List table happens to be showing.
+function loadRegisteredAccounts() {
+    $.getJSON("/api/registered-accounts", function (data) {
+        registeredStudentsDb = data || [];
+    });
+}
+
 function loadStudents() {
-    $.getJSON("/api/list-students", function (data) {
+    $.getJSON("/api/list-students", function (response) {
+        // Server returns { source, has_imported_roster, students: [...] }.
+        // The list is always a merged view: imported roster rows (validated
+        // against real accounts) plus any registered account not already
+        // covered by the roster.
+        const data = (response && response.students) ? response.students : [];
+
+        $('#importedBadge').toggle(!!(response && response.has_imported_roster));
+
         allStudentsData = data;
         filteredStudentsData = data;
         populateFilterOptions(data);
         renderStudentsTable(filteredStudentsData);
     }).fail(function () {
         $("#studentsTableBody").html(
-            '<tr><td colspan="5" class="text-center text-danger">Failed to load students</td></tr>'
+            '<tr><td colspan="6" class="text-center text-danger">Failed to load students</td></tr>'
         );
     });
 }
@@ -456,6 +579,28 @@ function getYearSection(s) {
     return 'N/A';
 }
 
+// Lowercases, trims, and collapses whitespace so that "Juan  Dela Cruz "
+// and "juan dela cruz" are treated as the same value when matching.
+function normalizeText(value) {
+    return (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Checks an imported row against the database list (registeredStudentsDb).
+// Matches by email first (most reliable), falling back to full name.
+function isStudentInDatabase(row) {
+    const emailNorm = normalizeText(row.email);
+    const nameNorm = normalizeText(row.full_name);
+
+    return registeredStudentsDb.some(dbStudent => {
+        const dbEmailNorm = normalizeText(dbStudent.email);
+        const dbNameNorm = normalizeText(dbStudent.full_name);
+
+        if (emailNorm && dbEmailNorm && emailNorm === dbEmailNorm) return true;
+        if (nameNorm && dbNameNorm && nameNorm === dbNameNorm) return true;
+        return false;
+    });
+}
+
 function populateFilterOptions(students) {
     const years = [...new Set(students.map(s => s.year).filter(Boolean))].sort();
     const sections = [...new Set(students.map(s => s.section).filter(Boolean))].sort();
@@ -475,7 +620,7 @@ function renderStudentsTable(students) {
     tbody.empty();
 
     if (!students.length) {
-        tbody.append('<tr><td colspan="5" class="text-center">No students found</td></tr>');
+        tbody.append('<tr><td colspan="6" class="text-center">No students found</td></tr>');
         return;
     }
 
@@ -486,7 +631,8 @@ function renderStudentsTable(students) {
         tbody.append(`
         <tr>
             <td>${index + 1}</td>
-            <td>${s.full_name}</td>
+            <td>${s.firstname || '-'}</td>
+            <td>${s.lastname || '-'}</td>
             <td>${s.email}</td>
             <td>${getYearSection(s)}</td>
             <td><span class="badge-registered ${badgeClass}">${status}</span></td>
@@ -503,8 +649,8 @@ function applyFilters() {
 
     filteredStudentsData = allStudentsData.filter(s => {
         if (searchText) {
-            const nameMatch = s.full_name.toLowerCase().includes(searchText);
-            const emailMatch = s.email.toLowerCase().includes(searchText);
+            const nameMatch = (s.full_name || '').toLowerCase().includes(searchText);
+            const emailMatch = (s.email || '').toLowerCase().includes(searchText);
             if (!nameMatch && !emailMatch) return false;
         }
         if (yearFilter && String(s.year) !== String(yearFilter)) return false;
@@ -527,10 +673,11 @@ function clearFilters() {
 }
 
 function exportToCSV() {
-    const headers = ['#', 'Full Name', 'Email Address', 'Year & Section', 'Registration Status'];
+    const headers = ['#', 'First Name', 'Last Name', 'Email Address', 'Year & Section', 'Registration Status'];
     const rows = filteredStudentsData.map((s, i) => [
         i + 1,
-        s.full_name,
+        s.firstname || '',
+        s.lastname || '',
         s.email,
         getYearSection(s),
         getRegistrationStatus(s)
@@ -546,6 +693,197 @@ function exportToCSV() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `students_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+/* ===================== IMPORT FEATURE ===================== */
+
+// Reads a header value from an imported row regardless of exact
+// capitalization/spacing (e.g. "Full Name", "full_name", "FULLNAME").
+function getImportField(row, candidateNames) {
+    const keys = Object.keys(row);
+    for (const key of keys) {
+        const normalizedKey = key.trim().toLowerCase().replace(/[\s_]+/g, ' ');
+        if (candidateNames.includes(normalizedKey)) {
+            return (row[key] !== undefined && row[key] !== null) ? row[key].toString().trim() : '';
+        }
+    }
+    return '';
+}
+
+function mapImportedRow(row) {
+    let firstname = getImportField(row, ['first name', 'firstname', 'given name']);
+    let lastname = getImportField(row, ['last name', 'lastname', 'surname', 'family name']);
+
+    // Fallback: if there's no separate First/Last Name columns, split a
+    // single "Full Name" column into first + last (first word = first name,
+    // remainder = last name).
+    if (!firstname && !lastname) {
+        const fullName = getImportField(row, ['full name', 'fullname', 'name', 'student name']);
+        if (fullName) {
+            const parts = fullName.trim().split(/\s+/);
+            firstname = parts.shift() || '';
+            lastname = parts.join(' ');
+        }
+    }
+
+    return {
+        firstname: firstname,
+        lastname: lastname,
+        full_name: `${firstname} ${lastname}`.trim(),
+        email: getImportField(row, ['email', 'email address', 'e mail']),
+        year: getImportField(row, ['year', 'grade', 'year level', 'grade level']),
+        section: getImportField(row, ['section'])
+    };
+}
+
+function parseImportFile(file, callback) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const firstSheet = workbook.Sheets[firstSheetName];
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+            callback(null, rows);
+        } catch (err) {
+            callback(err, null);
+        }
+    };
+    reader.onerror = function () {
+        callback(new Error('Failed to read file'), null);
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function previewImport() {
+    $('#importError').hide();
+
+    const fileInput = document.getElementById('importFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        $('#importError').text('Please select a CSV or Excel file first.').show();
+        return;
+    }
+
+    parseImportFile(file, function (err, rawRows) {
+        if (err) {
+            $('#importError').text('Could not read that file. Please upload a valid .csv, .xlsx, or .xls file.').show();
+            return;
+        }
+
+        if (!rawRows.length) {
+            $('#importError').text('The file appears to be empty.').show();
+            return;
+        }
+
+        const mappedRows = rawRows.map(mapImportedRow).filter(r => r.full_name || r.email);
+
+        if (!mappedRows.length) {
+            $('#importError').text('No valid rows found. Make sure the file has "First Name"/"Last Name" (or "Full Name") and/or "Email" columns.').show();
+            return;
+        }
+
+        // Validate each row against the database and attach the computed status.
+        let matched = 0;
+        mappedRows.forEach(r => {
+            const isRegistered = isStudentInDatabase(r);
+            r.registration_status = isRegistered ? 'Yes' : 'No';
+            if (isRegistered) matched++;
+        });
+
+        importedPreviewData = mappedRows;
+
+        const previewBody = $('#importPreviewBody');
+        previewBody.empty();
+        importedPreviewData.forEach((r, idx) => {
+            const badgeClass = r.registration_status === 'Yes' ? 'yes' : 'no';
+            previewBody.append(`
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${r.firstname || '-'}</td>
+                    <td>${r.lastname || '-'}</td>
+                    <td>${r.email || '-'}</td>
+                    <td>${getYearSection(r)}</td>
+                    <td><span class="badge-registered ${badgeClass}">${r.registration_status}</span></td>
+                </tr>
+            `);
+        });
+
+        $('#totalCount').text(importedPreviewData.length);
+        $('#matchedCount').text(matched);
+        $('#unmatchedCount').text(importedPreviewData.length - matched);
+
+        $('#importPreviewSection').show();
+        $('#confirmImportBtn').show();
+    });
+}
+
+function confirmImport() {
+    if (!importedPreviewData.length) return;
+
+    const $confirmBtn = $('#confirmImportBtn');
+    const originalBtnHtml = $confirmBtn.html();
+    $confirmBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+    $('#importError').hide();
+
+    // Only send the raw fields the server needs; registration_status is
+    // recomputed server-side and should not be trusted from the client.
+    const payload = importedPreviewData.map(r => ({
+        firstname: r.firstname,
+        lastname: r.lastname,
+        full_name: r.full_name,
+        email: r.email,
+        year: r.year,
+        section: r.section
+    }));
+
+    $.ajax({
+        url: '/api/master-list/import',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload)
+    }).done(function (response) {
+        if (!response || !response.success) {
+            $('#importError').text((response && response.message) || 'Import failed. Please try again.').show();
+            $confirmBtn.prop('disabled', false).html(originalBtnHtml);
+            return;
+        }
+
+        // Reload from the server so the table reflects what's actually
+        // persisted, with registration status validated against the DB.
+        loadStudents();
+        $('#importedBadge').show();
+        $('#importModal').modal('hide');
+    }).fail(function (xhr) {
+        const message = (xhr.responseJSON && xhr.responseJSON.message) || 'Could not reach the server. Please try again.';
+        $('#importError').text(message).show();
+        $confirmBtn.prop('disabled', false).html(originalBtnHtml);
+    });
+}
+
+function resetImportModal() {
+    document.getElementById('importFileInput').value = '';
+    $('#importPreviewSection').hide();
+    $('#importPreviewBody').empty();
+    $('#confirmImportBtn').hide();
+    $('#importError').hide();
+    importedPreviewData = [];
+}
+
+function downloadSampleTemplate() {
+    const csv = 'First Name,Last Name,Email,Year,Section\n'
+        + 'Juan,Dela Cruz,juan.delacruz@example.com,Grade 8,Sampaguita\n'
+        + 'Maria,Santos,maria.santos@example.com,Grade 9,Rosal\n';
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'master_list_import_template.csv';
     a.click();
     window.URL.revokeObjectURL(url);
 }
