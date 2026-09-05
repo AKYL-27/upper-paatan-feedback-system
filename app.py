@@ -47,6 +47,7 @@ users_collection = db["users"]
 document_requests_collection = db["document_requests"]
 feedback_collection = db["feedback"]
 document_types_collection = db["document_types"]
+master_students_collection = db["master_students"]  # imported roster (master list)
 
 print(f"Connected to database: {DB_NAME}")
 
@@ -444,26 +445,165 @@ def api_list_feedbacks():
     return jsonify(result)
 
 
+# -----------------------------
+# STUDENTS MASTER LIST + IMPORT
+# -----------------------------
+
+def _normalize(value):
+    """Lowercase/trim/collapse-whitespace helper for matching."""
+    return " ".join((value or "").strip().lower().split())
+
+
+@app.route("/api/registered-accounts")
+def api_registered_accounts():
+    """
+    Always returns real client accounts from users_collection (regardless of
+    whether a master roster has been imported). Used by the frontend to
+    validate a newly-imported file against actual registered accounts.
+    """
+    students = list(users_collection.find({"role": "client"}, {"firstname": 1, "lastname": 1, "email": 1}))
+    result = [{
+        "full_name": f"{s.get('firstname','')} {s.get('lastname','')}".strip(),
+        "email": s.get("email", ""),
+    } for s in students]
+    return jsonify(result)
+
+
 @app.route("/api/list-students")
 def api_list_students():
-    """Return all users with role 'client' (students)."""
-    students = list(users_collection.find({"role": "client"}))
+    """
+    Returns the Master List as a single merged view:
+
+    - Every imported roster row (master_students_collection), with
+      registration_status computed live against real client accounts
+      (matched by email, then by full name).
+    - Plus every registered client account that ISN'T already represented
+      by a roster row (so accounts aren't silently dropped just because
+      they weren't part of an import), always marked "Yes".
+
+    If nothing has ever been imported, this naturally reduces to just the
+    list of registered accounts (all "Yes"), same as before.
+    """
+    roster = list(master_students_collection.find().sort("imported_at", -1))
+    accounts = list(users_collection.find({"role": "client"}))
+
+    # Index accounts by normalized email and normalized full name so we can
+    # both (a) determine a roster row's registration_status and (b) know
+    # which accounts are already covered by the roster, so we don't list
+    # them twice.
+    accounts_by_email = {}
+    accounts_by_name = {}
+    for a in accounts:
+        email_norm = _normalize(a.get("email", ""))
+        name_norm = _normalize(f"{a.get('firstname','')} {a.get('lastname','')}")
+        if email_norm:
+            accounts_by_email[email_norm] = a
+        if name_norm:
+            accounts_by_name[name_norm] = a
+
+    matched_account_ids = set()
     result = []
 
-    for s in students:
+    for r in roster:
+        full_name = r.get("full_name", "")
+        email = r.get("email", "")
+        email_norm = _normalize(email)
+        name_norm = _normalize(full_name)
+
+        matched_account = accounts_by_email.get(email_norm) or accounts_by_name.get(name_norm)
+
+        if matched_account:
+            matched_account_ids.add(str(matched_account["_id"]))
+
         result.append({
-            "_id": str(s["_id"]),
-            "firstname": s.get("firstname", ""),
-            "lastname": s.get("lastname", ""),
-            "full_name": f"{s.get('firstname','')} {s.get('lastname','')}".strip(),
-            "email": s.get("email", "N/A"),
-            "year": s.get("year", "N/A"),
-            "section": s.get("section", "N/A"),
+            "_id": str(r["_id"]),
+            "firstname": r.get("firstname", ""),
+            "lastname": r.get("lastname", ""),
+            "full_name": full_name,
+            "email": email,
+            "year": r.get("year", "N/A"),
+            "section": r.get("section", "N/A"),
+            "registration_status": "Yes" if matched_account else "No",
+        })
+
+    # Add any registered account not already represented by a roster row.
+    for a in accounts:
+        if str(a["_id"]) in matched_account_ids:
+            continue
+        result.append({
+            "_id": str(a["_id"]),
+            "firstname": a.get("firstname", ""),
+            "lastname": a.get("lastname", ""),
+            "full_name": f"{a.get('firstname','')} {a.get('lastname','')}".strip(),
+            "email": a.get("email", "N/A"),
+            "year": a.get("year", "N/A"),
+            "section": a.get("section", "N/A"),
             # Anyone who has an account in the system is considered registered.
             "registration_status": "Yes",
         })
 
-    return jsonify(result)
+    return jsonify({
+        "source": "combined",
+        "has_imported_roster": len(roster) > 0,
+        "students": result
+    })
+
+
+@app.route("/api/master-list/import", methods=["POST"])
+def api_import_master_list():
+    """
+    Accepts a JSON array of roster rows (from the CSV/Excel import on the
+    Master List page) and inserts each one as a new document in
+    master_students_collection. Every import is inserted as new rows
+    (duplicates are allowed by design), and registration_status is always
+    recomputed live by /api/list-students rather than trusted from the client.
+    """
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, list) or not data:
+        return jsonify({"success": False, "message": "Expected a non-empty list of student rows"}), 400
+
+    docs_to_insert = []
+    now = datetime.now()
+
+    for row in data:
+        firstname = (row.get("firstname") or "").strip()
+        lastname = (row.get("lastname") or "").strip()
+        full_name = (row.get("full_name") or "").strip()
+        email = (row.get("email") or "").strip().lower()
+
+        # Derive whichever of firstname/lastname/full_name is missing, so
+        # both forms are always available for display and matching.
+        if not full_name and (firstname or lastname):
+            full_name = f"{firstname} {lastname}".strip()
+        elif full_name and not firstname and not lastname:
+            parts = full_name.split()
+            firstname = parts[0] if parts else ""
+            lastname = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+        # Skip completely empty rows
+        if not full_name and not email:
+            continue
+
+        docs_to_insert.append({
+            "firstname": firstname,
+            "lastname": lastname,
+            "full_name": full_name,
+            "email": email,
+            "year": (row.get("year") or "").strip(),
+            "section": (row.get("section") or "").strip(),
+            "imported_at": now,
+        })
+
+    if not docs_to_insert:
+        return jsonify({"success": False, "message": "No valid rows to import"}), 400
+
+    result = master_students_collection.insert_many(docs_to_insert)
+
+    return jsonify({
+        "success": True,
+        "inserted_count": len(result.inserted_ids)
+    })
 
 
 @app.route("/feedback/delete/<feedback_id>", methods=["POST"])
