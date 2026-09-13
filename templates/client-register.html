@@ -142,6 +142,7 @@ body::before {
     border-radius: 8px;
     font-size: 0.95rem;
     transition: all 0.3s ease;
+    width: 100%;
 }
 
 .form-control:focus {
@@ -191,6 +192,13 @@ select.form-control {
 .btn-register:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(28, 200, 138, 0.3);
+}
+
+.btn-register:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .divider {
@@ -245,6 +253,25 @@ select.form-control {
 .alert-success {
     background: #d4edda;
     color: #155724;
+}
+
+.field-error {
+    color: #c0392b;
+    font-size: 0.82rem;
+    margin-top: 0.35rem;
+    display: none;
+}
+
+.field-error.show {
+    display: block;
+}
+
+.input-wrapper.is-invalid .form-control {
+    border-color: #c0392b;
+}
+
+.input-wrapper.is-valid .form-control {
+    border-color: var(--primary-green);
 }
 
 /* Animations */
@@ -318,7 +345,7 @@ select.form-control {
                     {% endif %}
                     {% endwith %}
 
-                    <form method="POST">
+                    <form method="POST" id="registerForm" novalidate>
 
                         <div class="form-group">
                             <label for="firstName">First Name</label>
@@ -344,6 +371,20 @@ select.form-control {
                             </div>
                         </div>
 
+                        <div class="form-group">
+                            <label for="schoolYear">School Year</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-calendar-alt input-icon"></i>
+                                <select class="form-control" id="schoolYear" name="school_year" required>
+                                    <option value="" disabled selected>Select school year</option>
+                                    <option value="2024-2025">2024 - 2025</option>
+                                    <option value="2025-2026">2025 - 2026</option>
+                                    <option value="2026-2027">2026 - 2027</option>
+                                    <option value="2027-2028">2027 - 2028</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="year">Year Level</label>
@@ -365,21 +406,37 @@ select.form-control {
                                 <label for="section">Section</label>
                                 <div class="input-wrapper">
                                     <i class="fas fa-chalkboard input-icon"></i>
-                                    <input type="text" class="form-control" id="section" name="section" placeholder="e.g. Sampaguita" required>
+                                    <select class="form-control" id="section" name="section" required>
+                                        <option value="" disabled selected>Select section</option>
+                                        <option value="A">A</option>
+                                        <option value="B">B</option>
+                                        <option value="C">C</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label for="password">Password</label>
-                            <div class="input-wrapper">
+                            <div class="input-wrapper" id="passwordWrapper">
                                 <i class="fas fa-lock input-icon"></i>
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Create a strong password" required>
-                                <i class="fas fa-eye password-toggle" onclick="togglePassword()"></i>
+                                <input type="password" class="form-control" id="password" name="password" placeholder="Create a strong password" minlength="8" required>
+                                <i class="fas fa-eye password-toggle" onclick="togglePassword('password', this)"></i>
                             </div>
+                            <div class="field-error" id="passwordError">Password must be at least 8 characters.</div>
                         </div>
 
-                        <button type="submit" class="btn btn-register btn-block w-100">
+                        <div class="form-group">
+                            <label for="confirmPassword">Confirm Password</label>
+                            <div class="input-wrapper" id="confirmPasswordWrapper">
+                                <i class="fas fa-lock input-icon"></i>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="Re-enter your password" required>
+                                <i class="fas fa-eye password-toggle" onclick="togglePassword('confirmPassword', this)"></i>
+                            </div>
+                            <div class="field-error" id="confirmPasswordError">Passwords do not match.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-register btn-block w-100" id="submitBtn">
                             <i class="fas fa-user-plus me-2"></i>Create Account
                         </button>
 
@@ -401,20 +458,83 @@ select.form-control {
 </div>
 
 <script>
-function togglePassword() {
-    const passwordInput = document.getElementById('password');
-    const toggleIcon = document.querySelector('.password-toggle');
-    
+function togglePassword(inputId, iconEl) {
+    const passwordInput = document.getElementById(inputId);
+
     if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        toggleIcon.classList.remove('fa-eye');
-        toggleIcon.classList.add('fa-eye-slash');
+        iconEl.classList.remove('fa-eye');
+        iconEl.classList.add('fa-eye-slash');
     } else {
         passwordInput.type = 'password';
-        toggleIcon.classList.remove('fa-eye-slash');
-        toggleIcon.classList.add('fa-eye');
+        iconEl.classList.remove('fa-eye-slash');
+        iconEl.classList.add('fa-eye');
     }
 }
+
+const passwordInput = document.getElementById('password');
+const confirmPasswordInput = document.getElementById('confirmPassword');
+const passwordWrapper = document.getElementById('passwordWrapper');
+const confirmPasswordWrapper = document.getElementById('confirmPasswordWrapper');
+const passwordError = document.getElementById('passwordError');
+const confirmPasswordError = document.getElementById('confirmPasswordError');
+const registerForm = document.getElementById('registerForm');
+
+function validatePassword() {
+    const value = passwordInput.value;
+    if (value.length > 0 && value.length < 8) {
+        passwordWrapper.classList.add('is-invalid');
+        passwordWrapper.classList.remove('is-valid');
+        passwordError.classList.add('show');
+        return false;
+    } else if (value.length >= 8) {
+        passwordWrapper.classList.remove('is-invalid');
+        passwordWrapper.classList.add('is-valid');
+        passwordError.classList.remove('show');
+        return true;
+    } else {
+        passwordWrapper.classList.remove('is-invalid', 'is-valid');
+        passwordError.classList.remove('show');
+        return false;
+    }
+}
+
+function validateConfirmPassword() {
+    const value = confirmPasswordInput.value;
+    if (value.length === 0) {
+        confirmPasswordWrapper.classList.remove('is-invalid', 'is-valid');
+        confirmPasswordError.classList.remove('show');
+        return false;
+    } else if (value !== passwordInput.value) {
+        confirmPasswordWrapper.classList.add('is-invalid');
+        confirmPasswordWrapper.classList.remove('is-valid');
+        confirmPasswordError.classList.add('show');
+        return false;
+    } else {
+        confirmPasswordWrapper.classList.remove('is-invalid');
+        confirmPasswordWrapper.classList.add('is-valid');
+        confirmPasswordError.classList.remove('show');
+        return true;
+    }
+}
+
+passwordInput.addEventListener('input', () => {
+    validatePassword();
+    if (confirmPasswordInput.value.length > 0) {
+        validateConfirmPassword();
+    }
+});
+
+confirmPasswordInput.addEventListener('input', validateConfirmPassword);
+
+registerForm.addEventListener('submit', function (e) {
+    const passwordOk = validatePassword();
+    const confirmOk = validateConfirmPassword();
+
+    if (!passwordOk || !confirmOk) {
+        e.preventDefault();
+    }
+});
 </script>
 
 </body>
