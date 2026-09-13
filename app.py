@@ -521,6 +521,7 @@ def api_list_students():
             "lastname": r.get("lastname", ""),
             "full_name": full_name,
             "email": email,
+            "school_year": r.get("school_year", "N/A"),   # <-- add this line
             "year": r.get("year", "N/A"),
             "section": r.get("section", "N/A"),
             "registration_status": "Yes" if matched_account else "No",
@@ -536,6 +537,7 @@ def api_list_students():
             "lastname": a.get("lastname", ""),
             "full_name": f"{a.get('firstname','')} {a.get('lastname','')}".strip(),
             "email": a.get("email", "N/A"),
+            "school_year": a.get("school_year", "N/A"), 
             "year": a.get("year", "N/A"),
             "section": a.get("section", "N/A"),
             # Anyone who has an account in the system is considered registered.
@@ -590,6 +592,7 @@ def api_import_master_list():
             "lastname": lastname,
             "full_name": full_name,
             "email": email,
+            "school_year": (row.get("school_year") or "").strip(),   # <-- add this line
             "year": (row.get("year") or "").strip(),
             "section": (row.get("section") or "").strip(),
             "imported_at": now,
@@ -824,6 +827,8 @@ def client_register():
         last_name = request.form.get("last_name", "").strip()
         email = request.form.get("email", "").lower().strip()
         password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        school_year = request.form.get("school_year", "").strip()
         year = request.form.get("year", "").strip()
         section = request.form.get("section", "").strip()
 
@@ -832,13 +837,23 @@ def client_register():
             "first_name": first_name,
             "last_name": last_name,
             "email": email,
+            "school_year": school_year,
             "year": year,
             "section": section
         })
 
         # basic validation
-        if not first_name or not last_name or not email or not password or not year or not section:
+        if not first_name or not last_name or not email or not password or not confirm_password or not school_year or not year or not section:
             flash("All fields are required.", "danger")
+            return redirect(url_for("client_register"))
+
+        # server-side password confirmation (client-side JS can be bypassed)
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return redirect(url_for("client_register"))
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "danger")
             return redirect(url_for("client_register"))
 
         # check email exists
@@ -854,6 +869,7 @@ def client_register():
             "email": email,
             "password": hashed,
             "role": "client",
+            "school_year": school_year,
             "year": year,
             "section": section
         })
@@ -915,6 +931,8 @@ def update_client_profile():
         update_data["year"] = data["year"]
     if data.get("section"):
         update_data["section"] = data["section"]
+    if data.get("school_year"):
+        update_data["school_year"] = data["school_year"]
     
     # Update user
     users_collection.update_one(
