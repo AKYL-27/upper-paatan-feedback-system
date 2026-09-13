@@ -296,6 +296,13 @@
                             </div>
 
                             <div class="filter-item">
+                                <label for="filterSchoolYear">School Year</label>
+                                <select id="filterSchoolYear" class="form-control">
+                                    <option value="">All School Years</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-item">
                                 <label for="filterYear">Year</label>
                                 <select id="filterYear" class="form-control">
                                     <option value="">All Years</option>
@@ -344,13 +351,14 @@
                                             <th>First Name</th>
                                             <th>Last Name</th>
                                             <th>Email Address</th>
+                                            <th>School Year</th>
                                             <th>Year &amp; Section</th>
                                             <th>Registration Status</th>
                                         </tr>
                                     </thead>
                                     <tbody id="studentsTableBody">
                                         <tr>
-                                            <td colspan="6" class="text-center">Loading...</td>
+                                            <td colspan="7" class="text-center">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -421,7 +429,7 @@
                         Upload a CSV or Excel (.xlsx/.xls) file containing student details.
                         Expected columns: <strong>First Name</strong>, <strong>Last Name</strong>
                         (or a single <strong>Full Name</strong> column), <strong>Email</strong>,
-                        <strong>Year</strong>, <strong>Section</strong>.
+                        <strong>School Year</strong>, <strong>Year</strong>, <strong>Section</strong>.
                     </p>
                     <p class="text-muted" style="font-size: 0.85rem;">
                         Each row will be checked against the existing database (matched by email, or by full
@@ -464,6 +472,7 @@
                                         <th>First Name</th>
                                         <th>Last Name</th>
                                         <th>Email</th>
+                                        <th>School Year</th>
                                         <th>Year &amp; Section</th>
                                         <th>Status</th>
                                     </tr>
@@ -545,7 +554,7 @@ function loadStudents() {
         renderStudentsTable(filteredStudentsData);
     }).fail(function () {
         $("#studentsTableBody").html(
-            '<tr><td colspan="6" class="text-center text-danger">Failed to load students</td></tr>'
+            '<tr><td colspan="7" class="text-center text-danger">Failed to load students</td></tr>'
         );
     });
 }
@@ -579,6 +588,12 @@ function getYearSection(s) {
     return 'N/A';
 }
 
+// Returns the school year (e.g. "2025-2026") for display, falling back to 'N/A'.
+function getSchoolYear(s) {
+    const sy = (s.school_year || '').toString().trim();
+    return sy || 'N/A';
+}
+
 // Lowercases, trims, and collapses whitespace so that "Juan  Dela Cruz "
 // and "juan dela cruz" are treated as the same value when matching.
 function normalizeText(value) {
@@ -602,15 +617,19 @@ function isStudentInDatabase(row) {
 }
 
 function populateFilterOptions(students) {
+    const schoolYears = [...new Set(students.map(s => s.school_year).filter(Boolean))].sort();
     const years = [...new Set(students.map(s => s.year).filter(Boolean))].sort();
     const sections = [...new Set(students.map(s => s.section).filter(Boolean))].sort();
 
+    const $schoolYearSelect = $('#filterSchoolYear');
     const $yearSelect = $('#filterYear');
     const $sectionSelect = $('#filterSection');
 
+    $schoolYearSelect.find('option:not(:first)').remove();
     $yearSelect.find('option:not(:first)').remove();
     $sectionSelect.find('option:not(:first)').remove();
 
+    schoolYears.forEach(sy => $schoolYearSelect.append(`<option value="${sy}">${sy}</option>`));
     years.forEach(y => $yearSelect.append(`<option value="${y}">${y}</option>`));
     sections.forEach(sec => $sectionSelect.append(`<option value="${sec}">${sec}</option>`));
 }
@@ -620,7 +639,7 @@ function renderStudentsTable(students) {
     tbody.empty();
 
     if (!students.length) {
-        tbody.append('<tr><td colspan="6" class="text-center">No students found</td></tr>');
+        tbody.append('<tr><td colspan="7" class="text-center">No students found</td></tr>');
         return;
     }
 
@@ -634,6 +653,7 @@ function renderStudentsTable(students) {
             <td>${s.firstname || '-'}</td>
             <td>${s.lastname || '-'}</td>
             <td>${s.email}</td>
+            <td>${getSchoolYear(s)}</td>
             <td>${getYearSection(s)}</td>
             <td><span class="badge-registered ${badgeClass}">${status}</span></td>
         </tr>
@@ -643,6 +663,7 @@ function renderStudentsTable(students) {
 
 function applyFilters() {
     const searchText = $('#searchText').val().toLowerCase();
+    const schoolYearFilter = $('#filterSchoolYear').val();
     const yearFilter = $('#filterYear').val();
     const sectionFilter = $('#filterSection').val();
     const registrationFilter = $('#filterRegistration').val();
@@ -653,6 +674,7 @@ function applyFilters() {
             const emailMatch = (s.email || '').toLowerCase().includes(searchText);
             if (!nameMatch && !emailMatch) return false;
         }
+        if (schoolYearFilter && String(s.school_year) !== String(schoolYearFilter)) return false;
         if (yearFilter && String(s.year) !== String(yearFilter)) return false;
         if (sectionFilter && String(s.section) !== String(sectionFilter)) return false;
         if (registrationFilter && getRegistrationStatus(s) !== registrationFilter) return false;
@@ -665,6 +687,7 @@ function applyFilters() {
 
 function clearFilters() {
     $('#searchText').val('');
+    $('#filterSchoolYear').val('');
     $('#filterYear').val('');
     $('#filterSection').val('');
     $('#filterRegistration').val('');
@@ -673,12 +696,13 @@ function clearFilters() {
 }
 
 function exportToCSV() {
-    const headers = ['#', 'First Name', 'Last Name', 'Email Address', 'Year & Section', 'Registration Status'];
+    const headers = ['#', 'First Name', 'Last Name', 'Email Address', 'School Year', 'Year & Section', 'Registration Status'];
     const rows = filteredStudentsData.map((s, i) => [
         i + 1,
         s.firstname || '',
         s.lastname || '',
         s.email,
+        getSchoolYear(s),
         getYearSection(s),
         getRegistrationStatus(s)
     ]);
@@ -733,6 +757,7 @@ function mapImportedRow(row) {
         lastname: lastname,
         full_name: `${firstname} ${lastname}`.trim(),
         email: getImportField(row, ['email', 'email address', 'e mail']),
+        school_year: getImportField(row, ['school year', 'schoolyear', 'sy', 'academic year', 's y']),
         year: getImportField(row, ['year', 'grade', 'year level', 'grade level']),
         section: getImportField(row, ['section'])
     };
@@ -807,6 +832,7 @@ function previewImport() {
                     <td>${r.firstname || '-'}</td>
                     <td>${r.lastname || '-'}</td>
                     <td>${r.email || '-'}</td>
+                    <td>${getSchoolYear(r)}</td>
                     <td>${getYearSection(r)}</td>
                     <td><span class="badge-registered ${badgeClass}">${r.registration_status}</span></td>
                 </tr>
@@ -837,6 +863,7 @@ function confirmImport() {
         lastname: r.lastname,
         full_name: r.full_name,
         email: r.email,
+        school_year: r.school_year,
         year: r.year,
         section: r.section
     }));
@@ -875,9 +902,9 @@ function resetImportModal() {
 }
 
 function downloadSampleTemplate() {
-    const csv = 'First Name,Last Name,Email,Year,Section\n'
-        + 'Juan,Dela Cruz,juan.delacruz@example.com,Grade 8,Sampaguita\n'
-        + 'Maria,Santos,maria.santos@example.com,Grade 9,Rosal\n';
+    const csv = 'First Name,Last Name,Email,School Year,Year,Section\n'
+        + 'Juan,Dela Cruz,juan.delacruz@example.com,2025-2026,Grade 8,Sampaguita\n'
+        + 'Maria,Santos,maria.santos@example.com,2025-2026,Grade 9,Rosal\n';
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
