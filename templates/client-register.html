@@ -166,6 +166,16 @@ body::before {
     box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
 }
 
+/* Date input: keep the empty state looking like a placeholder */
+input[type="date"].form-control {
+    min-height: 3rem;
+    cursor: pointer;
+}
+
+input[type="date"].form-control:invalid {
+    color: var(--placeholder-color);
+}
+
 /* Selects */
 select.form-control {
     appearance: none;
@@ -405,6 +415,15 @@ select.form-control option[disabled] {
                         </div>
 
                         <div class="form-group">
+                            <label for="birthday">Birthday</label>
+                            <div class="input-wrapper" id="birthdayWrapper">
+                                <i class="fas fa-birthday-cake input-icon"></i>
+                                <input type="date" class="form-control" id="birthday" name="birthday" required>
+                            </div>
+                            <div class="field-error" id="birthdayError">Please enter a valid birthday that is not in the future.</div>
+                        </div>
+
+                        <div class="form-group">
                             <label for="schoolYear">School Year</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-calendar-alt input-icon"></i>
@@ -513,6 +532,39 @@ const passwordError = document.getElementById('passwordError');
 const confirmPasswordError = document.getElementById('confirmPasswordError');
 const registerForm = document.getElementById('registerForm');
 
+const birthdayInput = document.getElementById('birthday');
+const birthdayWrapper = document.getElementById('birthdayWrapper');
+const birthdayError = document.getElementById('birthdayError');
+
+// Don't allow future dates in the picker (local date, YYYY-MM-DD)
+(function setBirthdayMax() {
+    const t = new Date();
+    const mm = String(t.getMonth() + 1).padStart(2, '0');
+    const dd = String(t.getDate()).padStart(2, '0');
+    birthdayInput.max = `${t.getFullYear()}-${mm}-${dd}`;
+})();
+
+function validateBirthday() {
+    const value = birthdayInput.value;
+    if (!value) {
+        birthdayWrapper.classList.remove('is-invalid', 'is-valid');
+        birthdayError.classList.remove('show');
+        return false;
+    }
+    if (value > birthdayInput.max) {
+        birthdayWrapper.classList.add('is-invalid');
+        birthdayWrapper.classList.remove('is-valid');
+        birthdayError.classList.add('show');
+        return false;
+    }
+    birthdayWrapper.classList.remove('is-invalid');
+    birthdayWrapper.classList.add('is-valid');
+    birthdayError.classList.remove('show');
+    return true;
+}
+
+birthdayInput.addEventListener('change', validateBirthday);
+
 function validatePassword() {
     const value = passwordInput.value;
     if (value.length > 0 && value.length < 8) {
@@ -563,8 +615,9 @@ confirmPasswordInput.addEventListener('input', validateConfirmPassword);
 registerForm.addEventListener('submit', function (e) {
     const passwordOk = validatePassword();
     const confirmOk = validateConfirmPassword();
+    const birthdayOk = validateBirthday();
 
-    if (!passwordOk || !confirmOk) {
+    if (!passwordOk || !confirmOk || !birthdayOk) {
         e.preventDefault();
     }
 });
