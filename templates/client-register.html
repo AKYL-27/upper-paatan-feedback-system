@@ -14,6 +14,7 @@
 :root {
     --primary-green: #1cc88a;
     --dark-green: #13855c;
+    --placeholder-color: #adb5bd;
 }
 
 body {
@@ -112,14 +113,19 @@ body::before {
     font-size: 0.9rem;
 }
 
+/* Two-column row (Year Level / Section) */
 .form-row {
     display: flex;
     gap: 1rem;
+    margin-left: 0;          /* cancel Bootstrap 4 negative margins */
+    margin-right: 0;
 }
 
-.form-row .form-group {
+.form-row > .form-group {
     flex: 1;
     min-width: 0;
+    padding-left: 0;         /* cancel Bootstrap 4 side padding */
+    padding-right: 0;
 }
 
 .input-wrapper {
@@ -128,21 +134,31 @@ body::before {
 
 .input-icon {
     position: absolute;
-    left: 12px;
+    left: 14px;
     top: 50%;
     transform: translateY(-50%);
     color: #6c757d;
     font-size: 1rem;
     z-index: 2;
+    pointer-events: none;    /* clicks pass through to the input */
 }
 
+/* Inputs: height auto + explicit line-height so text/placeholder center properly */
 .form-control {
-    padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+    height: auto;
+    line-height: 1.5;
+    padding: 0.75rem 2.75rem;   /* left = icon space, right = eye icon / select arrow space */
     border: 2px solid #e0e0e0;
     border-radius: 8px;
     font-size: 0.95rem;
+    color: #495057;
     transition: all 0.3s ease;
     width: 100%;
+}
+
+.form-control::placeholder {
+    color: var(--placeholder-color);
+    opacity: 1;
 }
 
 .form-control:focus {
@@ -150,31 +166,48 @@ body::before {
     box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
 }
 
+/* Selects */
 select.form-control {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
+    background-color: #fff;
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
     background-repeat: no-repeat;
-    background-position: right 0.75rem center;
+    background-position: right 0.85rem center;
     background-size: 16px;
+    cursor: pointer;
+}
+
+/* Make the "Select ..." option look like a placeholder */
+select.form-control:invalid {
+    color: var(--placeholder-color);
+}
+
+select.form-control option {
+    color: #495057;
+}
+
+select.form-control option[disabled] {
+    color: var(--placeholder-color);
 }
 
 .password-toggle {
     position: absolute;
-    right: 12px;
+    right: 14px;
     top: 50%;
     transform: translateY(-50%);
     color: #6c757d;
     cursor: pointer;
     transition: color 0.3s ease;
+    z-index: 2;
 }
 
 .password-toggle:hover {
     color: var(--primary-green);
 }
 
-.btn{
+.btn {
     color: white;
 }
 
@@ -339,7 +372,7 @@ select.form-control {
                     {% if messages %}
                         {% for category, msg in messages %}
                             <div class="alert alert-{{category}}">
-                                <i class="fas fa-exclamation-circle me-2"></i>{{ msg }}
+                                <i class="fas fa-exclamation-circle mr-2"></i>{{ msg }}
                             </div>
                         {% endfor %}
                     {% endif %}
@@ -396,6 +429,8 @@ select.form-control {
                                         <option value="Grade 8">Grade 8</option>
                                         <option value="Grade 9">Grade 9</option>
                                         <option value="Grade 10">Grade 10</option>
+                                        <option value="Grade 11">Grade 11</option>
+                                        <option value="Grade 12">Grade 12</option>
                                     </select>
                                 </div>
                             </div>
@@ -435,7 +470,7 @@ select.form-control {
                         </div>
 
                         <button type="submit" class="btn btn-register btn-block w-100" id="submitBtn">
-                            <i class="fas fa-user-plus me-2"></i>Create Account
+                            <i class="fas fa-user-plus mr-2"></i>Create Account
                         </button>
 
                     </form>
