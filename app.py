@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from bson import ObjectId
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime, timedelta
+import re
 import os
 from collections import Counter
 
@@ -453,6 +454,21 @@ def _normalize(value):
     """Lowercase/trim/collapse-whitespace helper for matching."""
     return " ".join((value or "").strip().lower().split())
 
+# ---- paste the new helper here ----
+def is_in_master_list(first_name, last_name):
+    """True if first + last name matches a row in the imported master list
+    (case-insensitive, ignoring extra spaces)."""
+    full_name = f"{first_name} {last_name}"
+    parts = full_name.split()
+    if not parts:
+        return False
+
+    pattern = r"^\s*" + r"\s+".join(re.escape(p) for p in parts) + r"\s*$"
+    return master_students_collection.find_one(
+        {"full_name": {"$regex": pattern, "$options": "i"}}
+    ) is not None
+# ---- end of new helper ----
+
 
 @app.route("/api/registered-accounts")
 def api_registered_accounts():
@@ -855,6 +871,15 @@ def client_register():
         if len(password) < 8:
             flash("Password must be at least 8 characters.", "danger")
             return redirect(url_for("client_register"))
+
+                # ---- paste the new check here ----
+        # block registration if the student is not in the master list
+        if not is_in_master_list(first_name, last_name):
+            flash("Your name was not found in the school's master list. "
+                  "Please contact the school administrator.", "danger")
+            return redirect(url_for("client_register"))
+        # ---- end of new check ----
+
 
         # check email exists
         if users_collection.find_one({"email": email}):
