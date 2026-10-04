@@ -4,7 +4,7 @@ from pymongo import MongoClient
 from bson import ObjectId
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime, timedelta
-import re
+import re  
 import os
 from collections import Counter
 
@@ -454,7 +454,7 @@ def _normalize(value):
     """Lowercase/trim/collapse-whitespace helper for matching."""
     return " ".join((value or "").strip().lower().split())
 
-# ---- paste the new helper here ----
+
 def is_in_master_list(first_name, last_name):
     """True if first + last name matches a row in the imported master list
     (case-insensitive, ignoring extra spaces)."""
@@ -467,7 +467,6 @@ def is_in_master_list(first_name, last_name):
     return master_students_collection.find_one(
         {"full_name": {"$regex": pattern, "$options": "i"}}
     ) is not None
-# ---- end of new helper ----
 
 
 @app.route("/api/registered-accounts")
@@ -537,9 +536,7 @@ def api_list_students():
             "lastname": r.get("lastname", ""),
             "full_name": full_name,
             "email": email,
-            "school_year": r.get("school_year", "N/A"),   # <-- add this line
-            "year": r.get("year", "N/A"),
-            "section": r.get("section", "N/A"),
+            "birthday": r.get("birthday", "N/A"),
             "registration_status": "Yes" if matched_account else "No",
         })
 
@@ -553,9 +550,7 @@ def api_list_students():
             "lastname": a.get("lastname", ""),
             "full_name": f"{a.get('firstname','')} {a.get('lastname','')}".strip(),
             "email": a.get("email", "N/A"),
-            "school_year": a.get("school_year", "N/A"), 
-            "year": a.get("year", "N/A"),
-            "section": a.get("section", "N/A"),
+            "birthday": a.get("birthday", "N/A"),
             # Anyone who has an account in the system is considered registered.
             "registration_status": "Yes",
         })
@@ -608,9 +603,7 @@ def api_import_master_list():
             "lastname": lastname,
             "full_name": full_name,
             "email": email,
-            "school_year": (row.get("school_year") or "").strip(),   # <-- add this line
-            "year": (row.get("year") or "").strip(),
-            "section": (row.get("section") or "").strip(),
+            "birthday": (row.get("birthday") or "").strip(),
             "imported_at": now,
         })
 
@@ -801,12 +794,6 @@ def ratings_chart():
     return jsonify({"ratings": ratings, "counts": counts})
 
 
-
-
-
-
-
-
 # -----------------------------
 # CLIENT ROUTES
 # -----------------------------
@@ -844,6 +831,7 @@ def client_register():
         email = request.form.get("email", "").lower().strip()
         password = request.form.get("password")
         confirm_password = request.form.get("confirm_password")
+        birthday = request.form.get("birthday", "").strip()
         school_year = request.form.get("school_year", "").strip()
         year = request.form.get("year", "").strip()
         section = request.form.get("section", "").strip()
@@ -853,14 +841,26 @@ def client_register():
             "first_name": first_name,
             "last_name": last_name,
             "email": email,
+            "birthday": birthday,
             "school_year": school_year,
             "year": year,
             "section": section
         })
 
         # basic validation
-        if not first_name or not last_name or not email or not password or not confirm_password or not school_year or not year or not section:
+        if not first_name or not last_name or not email or not password or not confirm_password or not birthday or not school_year or not year or not section:
             flash("All fields are required.", "danger")
+            return redirect(url_for("client_register"))
+
+        # birthday must be a valid date (YYYY-MM-DD) and not in the future
+        try:
+            birthday_date = datetime.strptime(birthday, "%Y-%m-%d")
+        except ValueError:
+            flash("Please enter a valid birthday.", "danger")
+            return redirect(url_for("client_register"))
+
+        if birthday_date.date() > datetime.now().date():
+            flash("Birthday cannot be in the future.", "danger")
             return redirect(url_for("client_register"))
 
         # server-side password confirmation (client-side JS can be bypassed)
@@ -872,14 +872,11 @@ def client_register():
             flash("Password must be at least 8 characters.", "danger")
             return redirect(url_for("client_register"))
 
-                # ---- paste the new check here ----
         # block registration if the student is not in the master list
         if not is_in_master_list(first_name, last_name):
             flash("Your name was not found in the school's master list. "
                   "Please contact the school administrator.", "danger")
             return redirect(url_for("client_register"))
-        # ---- end of new check ----
-
 
         # check email exists
         if users_collection.find_one({"email": email}):
@@ -894,6 +891,7 @@ def client_register():
             "email": email,
             "password": hashed,
             "role": "client",
+            "birthday": birthday,
             "school_year": school_year,
             "year": year,
             "section": section
