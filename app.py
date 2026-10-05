@@ -832,23 +832,17 @@ def client_register():
         password = request.form.get("password")
         confirm_password = request.form.get("confirm_password")
         birthday = request.form.get("birthday", "").strip()
-        school_year = request.form.get("school_year", "").strip()
-        year = request.form.get("year", "").strip()
-        section = request.form.get("section", "").strip()
 
         # DEBUG: confirm what the server actually received from the form
         print("DEBUG - form data received:", {
             "first_name": first_name,
             "last_name": last_name,
             "email": email,
-            "birthday": birthday,
-            "school_year": school_year,
-            "year": year,
-            "section": section
+            "birthday": birthday
         })
 
         # basic validation
-        if not first_name or not last_name or not email or not password or not confirm_password or not birthday or not school_year or not year or not section:
+        if not first_name or not last_name or not email or not password or not confirm_password or not birthday:
             flash("All fields are required.", "danger")
             return redirect(url_for("client_register"))
 
@@ -891,10 +885,7 @@ def client_register():
             "email": email,
             "password": hashed,
             "role": "client",
-            "birthday": birthday,
-            "school_year": school_year,
-            "year": year,
-            "section": section
+            "birthday": birthday
         })
 
         flash("Account created successfully. Please login.", "success")
@@ -950,12 +941,6 @@ def update_client_profile():
         update_data["lastname"] = data["lastname"]
     if new_email:
         update_data["email"] = new_email
-    if data.get("year"):
-        update_data["year"] = data["year"]
-    if data.get("section"):
-        update_data["section"] = data["section"]
-    if data.get("school_year"):
-        update_data["school_year"] = data["school_year"]
     
     # Update user
     users_collection.update_one(
