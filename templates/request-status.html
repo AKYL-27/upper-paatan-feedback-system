@@ -191,10 +191,19 @@
         }
 
         .reason-text {
+            display: inline-block;
             max-width: 250px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            vertical-align: middle;
+        }
+
+        .remarks-text {
+            display: block;
+            max-width: 250px;
+            white-space: normal;
+            word-break: break-word;
         }
 
         .status-badge {
@@ -366,10 +375,10 @@
             <select class="filter-select" id="statusFilter" onchange="filterTable()">
                 <option value="all">All Requests</option>
                 <option value="Pending">Pending</option>
-                <option value="Processing">Processing</option>
-                <option value="Ready">Ready for Pickup</option>
-                <option value="Released">Released</option>
-                <option value="Rejected">Rejected</option>
+                <option value="On Process">On Process</option>
+                <option value="Ready to Claim">Ready to Claim</option>
+                <option value="Completed">Completed</option>
+                <option value="Declined">Declined</option>
             </select>
         </div>
         {% endif %}
@@ -399,13 +408,14 @@
                             <th>Purpose</th>
                             <th>Status</th>
                             <th>Date Requested</th>
+                            <th>Remarks</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for r in requests %}
                         <tr data-status="{{ r.status }}">
                             <td>
-                                <span class="request-id">#{{ r._id }}</span>
+                                <span class="request-id">{{ r.request_id }}</span>
                             </td>
                             <td>
                                 {{ r.student_name }}
@@ -422,21 +432,21 @@
                                     <span class="status-badge status-pending">
                                         <i class="fas fa-clock"></i> Pending
                                     </span>
-                                {% elif r.status == "Processing" %}
+                                {% elif r.status == "On Process" %}
                                     <span class="status-badge status-processing">
-                                        <i class="fas fa-spinner"></i> Processing
+                                        <i class="fas fa-spinner"></i> On Process
                                     </span>
-                                {% elif r.status == "Ready" %}
+                                {% elif r.status == "Ready to Claim" %}
                                     <span class="status-badge status-ready">
-                                        <i class="fas fa-check-circle"></i> Ready for Pickup
+                                        <i class="fas fa-check-circle"></i> Ready to Claim
                                     </span>
-                                {% elif r.status == "Released" %}
+                                {% elif r.status == "Completed" %}
                                     <span class="status-badge status-released">
-                                        <i class="fas fa-check-double"></i> Released
+                                        <i class="fas fa-check-double"></i> Completed
                                     </span>
-                                {% elif r.status == "Rejected" %}
+                                {% elif r.status == "Declined" %}
                                     <span class="status-badge status-rejected">
-                                        <i class="fas fa-times-circle"></i> Rejected
+                                        <i class="fas fa-times-circle"></i> Declined
                                     </span>
                                 {% else %}
                                     <span class="status-badge status-default">
@@ -449,6 +459,13 @@
                                     <i class="far fa-calendar-alt me-1"></i>
                                     {{ r.created_at.strftime("%B %d, %Y") if r.created_at else "N/A" }}
                                 </span>
+                            </td>
+                            <td>
+                                {% if r.remarks %}
+                                    <span class="remarks-text">{{ r.remarks }}</span>
+                                {% else %}
+                                    <span class="text-muted">&mdash;</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
