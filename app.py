@@ -28,6 +28,13 @@ def to_24h(time_str):
     except ValueError:
         return time_str
 
+# -----------------------------
+# REQUEST ID HELPER (shared by admin + client pages so IDs always match)
+# -----------------------------
+def format_request_id(oid):
+    """Readable request ID, e.g. REQ-A3F9C1 (last 6 chars of the MongoDB _id)."""
+    return "REQ-" + str(oid)[-6:].upper()
+
 # Load .env
 load_dotenv(find_dotenv())
 
@@ -362,16 +369,26 @@ def api_create_request():
     return jsonify({"success": True, "request_id": str(result.inserted_id)})
 
 
-# Update request status (Approve/Decline)
 # Update request status with multi-step workflow
+# (approve -> On Process, ready -> Ready to Claim, complete -> Completed, decline -> Declined)
 @app.route("/api/request/update/<request_id>", methods=["POST"])
 def api_update_request(request_id):
-    data = request.json
+    data = request.json or {}
     action = data.get("action")  # approve, decline, ready, complete
-    remarks = data.get("remarks", "")
-    
-    update_data = {"remarks": remarks}
-    
+    remarks = (data.get("remarks") or "").strip()
+
+    if action not in ("approve", "decline", "ready", "complete"):
+        return jsonify({"success": False, "message": "Invalid action"}), 400
+
+    # Remarks are mandatory only when declining
+    if action == "decline" and not remarks:
+        return jsonify({"success": False, "message": "Remarks are required when declining a request."}), 400
+
+    update_data = {}
+    # Only save remarks when provided, so existing remarks are not wiped
+    if remarks:
+        update_data["remarks"] = remarks
+
     # Define status transitions based on action
     if action == "approve":
         update_data["status"] = "On Process"
@@ -383,7 +400,7 @@ def api_update_request(request_id):
     elif action == "complete":
         update_data["status"] = "Completed"
         update_data["completed_date"] = datetime.now()
-    
+
     document_requests_collection.update_one(
         {"_id": ObjectId(request_id)}, 
         {"$set": update_data}
@@ -393,6 +410,15 @@ def api_update_request(request_id):
 @app.route("/api/list-requests")
 def api_list_requests():
     requests = list(document_requests_collection.find().sort("request_date", -1))
+
+    # Latest feedback per user (feedback is not linked to a specific request,
+    # so we show the most recent feedback submitted by the same requester).
+    latest_feedback = {}
+    for fb in feedback_collection.find({"user_id": {"$ne": None}}).sort("date_submitted", -1):
+        uid = fb["user_id"]
+        if uid not in latest_feedback:  # first one seen = newest
+            latest_feedback[uid] = fb
+
     result = []
 
     for req in requests:
@@ -412,15 +438,25 @@ def api_list_requests():
         # Format request date
         request_date = req.get("request_date")
         request_date_formatted = request_date.strftime("%B %d, %Y") if request_date else "N/A"
+        request_date_iso = request_date.strftime("%Y-%m-%d") if request_date else ""
+
+        # Feedback from this requester
+        fb = latest_feedback.get(req.get("user_id"))
 
         result.append({
             "_id": str(req["_id"]),
+            # Readable request ID shown instead of the row count, e.g. REQ-A3F9C1
+            "request_id": format_request_id(req["_id"]),
             "user_name": user_name,             # for admin table column: Requester
-            "student_name": student_name,       # for admin table column: Student Name
+            "student_name": student_name,
             "document_type_name": document_type_name,
             "reason": req.get("reason", ""),
             "status": req.get("status", "Pending"),
-            "request_date_formatted": request_date_formatted
+            "remarks": req.get("remarks", ""),
+            "feedback_rating": fb.get("rating") if fb else None,
+            "feedback_comments": fb.get("comments", "") if fb else "",
+            "request_date_formatted": request_date_formatted,
+            "request_date_iso": request_date_iso
         })
 
     return jsonify(result)
@@ -621,7 +657,7 @@ def api_import_master_list():
 @app.route("/feedback/delete/<feedback_id>", methods=["POST"])
 def delete_feedback(feedback_id):
     feedback_collection.delete_one({"_id": ObjectId(feedback_id)})
-    return redirect(url_for("feedbacks"))
+    return redirect(url_for("admin_feedbacks"))  # fixed: endpoint is admin_feedbacks
 
 # -----------------------------
 # API ROUTES FOR REPORTS
@@ -832,17 +868,23 @@ def client_register():
         password = request.form.get("password")
         confirm_password = request.form.get("confirm_password")
         birthday = request.form.get("birthday", "").strip()
+        school_year = request.form.get("school_year", "").strip()
+        year = request.form.get("year", "").strip()
+        section = request.form.get("section", "").strip()
 
         # DEBUG: confirm what the server actually received from the form
         print("DEBUG - form data received:", {
             "first_name": first_name,
             "last_name": last_name,
             "email": email,
-            "birthday": birthday
+            "birthday": birthday,
+            "school_year": school_year,
+            "year": year,
+            "section": section
         })
 
         # basic validation
-        if not first_name or not last_name or not email or not password or not confirm_password or not birthday:
+        if not first_name or not last_name or not email or not password or not confirm_password or not birthday or not school_year or not year or not section:
             flash("All fields are required.", "danger")
             return redirect(url_for("client_register"))
 
@@ -885,7 +927,10 @@ def client_register():
             "email": email,
             "password": hashed,
             "role": "client",
-            "birthday": birthday
+            "birthday": birthday,
+            "school_year": school_year,
+            "year": year,
+            "section": section
         })
 
         flash("Account created successfully. Please login.", "success")
@@ -941,6 +986,12 @@ def update_client_profile():
         update_data["lastname"] = data["lastname"]
     if new_email:
         update_data["email"] = new_email
+    if data.get("year"):
+        update_data["year"] = data["year"]
+    if data.get("section"):
+        update_data["section"] = data["section"]
+    if data.get("school_year"):
+        update_data["school_year"] = data["school_year"]
     
     # Update user
     users_collection.update_one(
@@ -1057,6 +1108,7 @@ def client_request_status():
 
     # Normalize fields for template
     for r in requests:
+        r["request_id"] = format_request_id(r["_id"])  # same ID the admin sees
         r["_id"] = str(r["_id"])   # convert ObjectId to string
         r["created_at"] = r.get("request_date")  # match your HTML
 
