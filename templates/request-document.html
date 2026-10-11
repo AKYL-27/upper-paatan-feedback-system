@@ -1,386 +1,702 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Request Document | UPHS Portal</title>
-<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Document Requests | UPHS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/upper-paatan-logo.png') }}">
 
 
-<link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
 
-<style>
-:root {
-    --primary-green: #1cc88a;
-    --dark-green: #13855c;
-}
-
-body {
-    background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
-    min-height: 100vh;
-    padding: 2rem 0;
-}
-
-.top-nav {
-    margin-bottom: 1rem;
-    animation: fadeInUp 0.4s ease-out;
-}
-
-.page-header {
-    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
-    padding: 2rem;
-    border-radius: 15px;
-    margin-bottom: 2rem;
-    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.2);
-}
-
-.page-header h2 {
-    color: white;
-    font-weight: 600;
-    margin: 0;
-    font-size: 1.8rem;
-}
-
-.page-header p {
-    color: rgba(255, 255, 255, 0.9);
-    margin: 0.5rem 0 0 0;
-    font-size: 0.95rem;
-}
-
-.request-card {
-    background: white;
-    border-radius: 15px;
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-    border: none;
-    overflow: hidden;
-}
-
-.card-body {
-    padding: 2.5rem;
-}
-
-.section-title {
-    color: #2c3e50;
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid #f0f0f0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.section-title i {
-    color: var(--primary-green);
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    color: #495057;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.form-group label i {
-    color: var(--primary-green);
-    font-size: 0.85rem;
-}
-
-.required-mark {
-    color: #e74a3b;
-    margin-left: 0.2rem;
-}
-
-.input-wrapper {
-    position: relative;
-}
-
-.form-control {
-    padding: 0.75rem 1rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-}
-
-.form-control:focus {
-    border-color: var(--primary-green);
-    box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
-}
-
-textarea.form-control {
-    resize: vertical;
-    min-height: 100px;
-}
-
-select.form-control {
-    padding: 0.75rem 2.5rem 0.75rem 1rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    cursor: pointer;
-    appearance: auto;
-    background-color: white;
-    height: auto;
-    min-height: 45px;
-    display: flex;
-    align-items: center;
-}
-
-select.form-control:focus {
-    border-color: var(--primary-green);
-    box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
-}
-
-select.form-control option {
-    padding: 0.5rem;
-}
-
-.info-box {
-    background: #e7f9f2;
-    border-left: 4px solid var(--primary-green);
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    display: flex;
-    gap: 1rem;
-}
-
-.info-box i {
-    color: var(--primary-green);
-    font-size: 1.2rem;
-    flex-shrink: 0;
-    margin-top: 0.2rem;
-}
-
-.info-box-content h6 {
-    color: var(--dark-green);
-    font-weight: 600;
-    margin: 0 0 0.5rem 0;
-    font-size: 0.95rem;
-}
-
-.info-box-content p {
-    color: #495057;
-    font-size: 0.85rem;
-    margin: 0;
-    line-height: 1.5;
-}
-
-.btn-submit {
-    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
-    border: none;
-    padding: 0.65rem 1.5rem;
-    font-weight: 600;
-    font-size: 0.95rem;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-}
-
-.btn-submit:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.3);
-}
-
-.action-buttons {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1.5rem;
-    justify-content: flex-end;
-}
-
-.btn-back {
-    background: white;
-    border: 2px solid #e0e0e0;
-    color: #6c757d;
-    padding: 0.65rem 1.5rem;
-    font-weight: 500;
-    font-size: 0.95rem;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-}
-
-.btn-back:hover {
-    background: #f8f9fa;
-    border-color: #c0c0c0;
-    color: #495057;
-    transform: translateY(-2px);
-}
-
-.document-options {
-    display: grid;
-    gap: 0.5rem;
-}
-
-/* Animations */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.page-header {
-    animation: fadeInUp 0.5s ease-out;
-}
-
-.request-card {
-    animation: fadeInUp 0.6s ease-out;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .card-body {
-        padding: 1.5rem;
-    }
-    
-    .page-header {
-        padding: 1.5rem;
-    }
-    
-    .page-header h2 {
-        font-size: 1.5rem;
-    }
-    
-    .action-buttons {
-        flex-direction: column-reverse;
-        justify-content: flex-end;
-    }
-    
-    .btn-submit {
-        width: 100%;
-    }
-}
-
-/* Character counter */
-.char-counter {
-    font-size: 0.8rem;
-    color: #6c757d;
-    text-align: right;
-    margin-top: 0.3rem;
-}
-</style>
+    <style>
+        .bg-gradient-primary {
+            background-color: #1cc88a;
+            background-image: linear-gradient(180deg, #1cc88a 10%, #13855c 100%);
+        }
+        
+        .filter-section {
+            background: #f8f9fc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        
+        .filter-item {
+            flex: 1;
+            min-width: 180px;
+        }
+        
+        .filter-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #5a5c69;
+            font-size: 0.875rem;
+        }
+        
+        .filter-item select,
+        .filter-item input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d3e2;
+            border-radius: 5px;
+            font-size: 0.875rem;
+        }
+        
+        .btn-filter {
+            padding: 8px 20px;
+            margin-top: 5px;
+        }
+        
+        .badge-on-process {
+            background-color: #36b9cc;
+            color: white;
+        }
+        
+        .badge-ready {
+            background-color: #4e73df;
+            color: white;
+        }
+    </style>
 </head>
 
-<body>
+<body id="page-top">
+    <div id="wrapper">
+        <!-- Sidebar -->
+        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
+                <div class="sidebar-brand-icon">
+                    <img src="{{url_for('static', filename='img/upper-paatan-logo3.png') }}" alt="Logo" style="width:50px; height:50px; object-fit:contain;">
+                </div>
+                <div class="sidebar-brand-text mx-3">U P H S</div>
+            </a>
 
-<div class="container">
+            <hr class="sidebar-divider my-0">
 
-    <!-- Top Navigation -->
-    <div class="top-nav">
-        <a href="/client/home" class="btn btn-back">
-            <i class="fas fa-arrow-left me-2"></i>Back to Home
-        </a>
-    </div>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/dashboard">
+                    <i class="fas fa-fw fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
 
-    <!-- Page Header -->
-    <div class="page-header">
-        <h2><i class="fas fa-file-alt me-2"></i>Request School Document</h2>
-        <p>Fill out the form below to request official documents from Upper Paatan High School</p>
-    </div>
+            <hr class="sidebar-divider">
 
-    <!-- Request Form Card -->
-    <div class="card request-card">
-        <div class="card-body">
+            <div class="sidebar-heading">Interface</div>
 
-            <!-- Information Box -->
-            <div class="info-box">
-                <i class="fas fa-info-circle"></i>
-                <div class="info-box-content">
-                    <h6>Processing Time</h6>
-                    <p>Document requests are typically processed within 3-5 business days. You can check the status of your request in Request Status and see when your document is ready for pickup.</p>
+            <li class="nav-item active">
+                <a class="nav-link" href="document-requests">
+                    <i class="fas fa-fw fa-file"></i>
+                    <span>Document Requests</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="feedbacks">
+                    <i class="fas fa-fw fa-comments"></i>
+                    <span>Feedback Management</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="reports">
+                    <i class="fas fa-fw fa-copy"></i>
+                    <span>Reports</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="students">
+                    <i class="fas fa-fw fa-user-graduate"></i>
+                    <span>Registered Students</span></a>
+            </li>
+
+
+            <hr class="sidebar-divider d-none d-md-block">
+
+            <div class="text-center d-none d-md-inline">
+                <button class="rounded-circle border-0" id="sidebarToggle"></button>
+            </div>
+        </ul>
+
+        <div id="content-wrapper" class="d-flex flex-column">
+            <div id="content">
+                <!-- Topbar -->
+                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                    <form class="form-inline">
+                        <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                    </form>
+
+                    <ul class="navbar-nav ml-auto">
+                        <li class="nav-item dropdown no-arrow">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <img class="img-profile rounded-circle"
+                                    src="{{ url_for('static', filename='img/undraw_profile.svg') }}">
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                                aria-labelledby="userDropdown">
+                                <a class="dropdown-item" href="/admin/profile">
+                                    <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Profile
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                    Logout
+                                </a>
+                            </div>
+                        </li>
+                    </ul>
+                </nav>
+
+                <!-- Page Content -->
+                <div class="container-fluid">
+                    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+                        <h1 class="h3 mb-0 text-gray-800">Document Requests</h1>
+                        <div>
+                            <button class="btn btn-success btn-sm mr-2" onclick="exportToPDF()">
+                                <i class="fas fa-file-pdf"></i> Export to PDF
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="exportToCSV()">
+                                <i class="fas fa-download"></i> Export to CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Section -->
+                    <div class="filter-section">
+                        <div class="filter-group">
+                            <div class="filter-item">
+                                <label for="filterStatus">Filter by Status</label>
+                                <select id="filterStatus" class="form-control">
+                                    <option value="">All Status</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="On Process">On Process</option>
+                                    <option value="Ready to Claim">Ready to Claim</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Declined">Declined</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="filterDocType">Document Type</label>
+                                <select id="filterDocType" class="form-control">
+                                    <option value="">All Types</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="filterDateFrom">Date From</label>
+                                <input type="date" id="filterDateFrom" class="form-control">
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="filterDateTo">Date To</label>
+                                <input type="date" id="filterDateTo" class="form-control">
+                            </div>
+                            
+                            <div class="filter-item">
+                                <label for="searchText">Search</label>
+                                <input type="text" id="searchText" class="form-control" placeholder="Search by name, ID, remarks...">
+                            </div>
+                            
+                            <div>
+                                <button class="btn btn-primary btn-filter" onclick="applyFilters()">
+                                    <i class="fas fa-filter"></i> Apply
+                                </button>
+                                <button class="btn btn-secondary btn-filter" onclick="clearFilters()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DataTable -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">All Document Requests</h6>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Request ID</th>
+                                            <th>Requester</th>
+                                            <th>Document Type</th>
+                                            <th>Purpose</th>
+                                            <th>Status</th>
+                                            <th>Date Requested</th>
+                                            <th>Remarks</th>
+                                            <th>Feedback</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requestTableBody">
+                                        <tr>
+                                            <td colspan="9" class="text-center">Loading...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <form method="POST" action="/submit-request">
-
-                <!-- Personal Information Section -->
-                <div class="section-title">
-                    <i class="fas fa-user"></i>
-                    <span>Personal Information</span>
-                </div>
-
-                <div class="form-group">
-                    <label for="fullName">
-                        <i class="fas fa-id-card"></i>
-                        Student Full Name
-                        <span class="required-mark">*</span>
-                    </label>
-                    <input type="text" id="fullName" name="name" class="form-control" placeholder="Enter your complete name" required>
-                </div>
-
-                <!-- Document Information Section -->
-                <div class="section-title">
-                    <i class="fas fa-file-invoice"></i>
-                    <span>Document Information</span>
-                </div>
-
-                <div class="form-group">
-                    <label for="documentType">
-                        <i class="fas fa-list"></i>
-                        Document Type
-                        <span class="required-mark">*</span>
-                    </label>
-                    <select class="form-control" id="documentType" name="document_type" required>
-                        <option value="" disabled selected>Select Document Type</option>
-                        <option value="certification">CERTIFICATION</option>
-                        <option value="diploma">DIPLOMA</option>
-                        <option value="transcript">GOOD MORAL</option>
-                        <option value="report_card">FORM 137</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="reason">
-                        <i class="fas fa-comment-dots"></i>
-                        Purpose/Reason for Request
-                        <span class="required-mark">*</span>
-                    </label>
-                    <textarea class="form-control" id="reason" name="reason" rows="4" placeholder="Please explain why you need this document (e.g., college application, employment, scholarship application)" maxlength="500" required></textarea>
-                    <div class="char-counter">
-                        <span id="charCount">0</span>/500 characters
+            <!-- Footer -->
+            <footer class="sticky-footer bg-white">
+                <div class="container my-auto">
+                    <div class="copyright text-center my-auto">
+                        <span>FEEDBACK SYSTEM UPPER PAATAN HIGH SCHOOL 2025</span>
                     </div>
                 </div>
-
-                <!-- Action Buttons -->
-                <div class="action-buttons">
-                    <button type="submit" class="btn btn-submit">
-                        <i class="fas fa-paper-plane me-2"></i>Submit Request
-                    </button>
-                </div>
-
-            </form>
-
+            </footer>
         </div>
     </div>
 
-</div>
+    <!-- Scroll to Top -->
+    <a class="scroll-to-top rounded" href="#page-top">
+        <i class="fas fa-angle-up"></i>
+    </a>
 
-<script>
-// Character counter for textarea
-const textarea = document.getElementById('reason');
-const charCount = document.getElementById('charCount');
+    <!-- Logout Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ready to Leave?</h5>
+                    <button class="close" type="button" data-dismiss="modal">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <a class="btn btn-primary" href="/admin/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
 
-textarea.addEventListener('input', function() {
-    charCount.textContent = this.value.length;
-});
-</script>
+    <!-- Remarks Modal (approve / decline / ready / complete) -->
+    <div class="modal fade" id="remarksModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="remarksModalTitle">Update Request</h5>
+                    <button class="close" type="button" data-dismiss="modal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="remarksModalMessage" class="mb-3"></p>
+                    <div class="form-group mb-0">
+                        <label for="remarksText" id="remarksLabel" class="font-weight-bold">Remarks (optional)</label>
+                        <textarea id="remarksText" class="form-control" rows="4" maxlength="500"
+                                  placeholder="Type your remarks here..."></textarea>
+                        <small id="remarksError" class="text-danger" style="display:none;">
+                            Remarks are required when declining a request.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" type="button" id="remarksSubmitBtn" onclick="submitRemarks()">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery-easing/jquery.easing.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sb-admin-2.min.js') }}"></script>
+
+    <!-- jsPDF and jsPDF-AutoTable for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+    let allRequestsData = [];
+    let filteredData = [];
+
+    $(document).ready(function() {
+        loadRequests();
+    });
+
+    // Escape user-supplied text before putting it into innerHTML
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function truncate(text, max) {
+        text = text || '';
+        return text.length > max ? text.substring(0, max) + '...' : text;
+    }
+
+    function loadRequests() {
+        $.getJSON("{{ url_for('api_list_requests') }}", function(data) {
+            allRequestsData = data;
+            filteredData = data;
+            populateDocTypeFilter();
+            renderTable();
+        }).fail(function() {
+            $("#requestTableBody").html('<tr><td colspan="9" class="text-center text-danger">Error loading data</td></tr>');
+        });
+    }
+
+    function populateDocTypeFilter() {
+        const docTypes = [...new Set(allRequestsData.map(req => req.document_type_name))];
+        const select = $('#filterDocType');
+        select.find('option:not(:first)').remove();
+        docTypes.forEach(type => {
+            select.append(`<option value="${esc(type)}">${esc(type)}</option>`);
+        });
+    }
+
+    function renderFeedback(req) {
+        if (!req.feedback_rating) return '<span class="text-muted">No feedback</span>';
+        const stars = '★'.repeat(req.feedback_rating) + '☆'.repeat(5 - req.feedback_rating);
+        const comment = req.feedback_comments
+            ? `<br><small>${esc(truncate(req.feedback_comments, 40))}</small>`
+            : '';
+        return `<span class="text-warning">${stars}</span>${comment}`;
+    }
+
+    function feedbackText(req) {
+        if (!req.feedback_rating) return 'No feedback';
+        return `${req.feedback_rating}/5` + (req.feedback_comments ? ` - ${req.feedback_comments}` : '');
+    }
+
+    function renderTable() {
+        let tbody = $("#requestTableBody");
+        tbody.empty();
+
+        if (!filteredData.length) {
+            tbody.append('<tr><td colspan="9" class="text-center">No requests available</td></tr>');
+            return;
+        }
+
+        filteredData.forEach(function(req) {
+            // Status badge
+            let statusBadge = '';
+            switch(req.status) {
+                case "Pending":
+                    statusBadge = '<span class="badge badge-warning">Pending</span>';
+                    break;
+                case "On Process":
+                    statusBadge = '<span class="badge badge-on-process">On Process</span>';
+                    break;
+                case "Ready to Claim":
+                    statusBadge = '<span class="badge badge-ready">Ready to Claim</span>';
+                    break;
+                case "Completed":
+                    statusBadge = '<span class="badge badge-success">Completed</span>';
+                    break;
+                case "Declined":
+                    statusBadge = '<span class="badge badge-danger">Declined</span>';
+                    break;
+                default:
+                    statusBadge = `<span class="badge badge-secondary">${esc(req.status)}</span>`;
+            }
+
+            // Action buttons based on status
+            let actionButtons = '';
+            switch(req.status) {
+                case "Pending":
+                    actionButtons = `
+                        <button class="btn btn-success btn-sm" onclick="updateRequest('${req._id}', 'approve')">
+                            <i class="fas fa-check"></i> Approve
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="updateRequest('${req._id}', 'decline')">
+                            <i class="fas fa-times"></i> Decline
+                        </button>`;
+                    break;
+                case "On Process":
+                    actionButtons = `
+                        <button class="btn btn-primary btn-sm" onclick="updateRequest('${req._id}', 'ready')">
+                            <i class="fas fa-clipboard-check"></i> Ready
+                        </button>`;
+                    break;
+                case "Ready to Claim":
+                    actionButtons = `
+                        <button class="btn btn-success btn-sm" onclick="updateRequest('${req._id}', 'complete')">
+                            <i class="fas fa-check-double"></i> Complete
+                        </button>`;
+                    break;
+                default:
+                    actionButtons = `<span class="text-muted">No actions</span>`;
+            }
+
+            tbody.append(`
+                <tr>
+                    <td><strong>${esc(req.request_id)}</strong></td>
+                    <td>${esc(req.user_name)}</td>
+                    <td>${esc(req.document_type_name)}</td>
+                    <td>${esc(truncate(req.reason, 40))}</td>
+                    <td>${statusBadge}</td>
+                    <td>${esc(req.request_date_formatted)}</td>
+                    <td>${req.remarks ? esc(req.remarks) : '<span class="text-muted">—</span>'}</td>
+                    <td>${renderFeedback(req)}</td>
+                    <td>${actionButtons}</td>
+                </tr>
+            `);
+        });
+    }
+
+    const actionConfig = {
+        approve:  { title: 'Approve Request', message: 'Status will change to "On Process".', btn: 'Approve', btnClass: 'btn-success', required: false,
+                    success: 'Request approved! Status changed to "On Process".' },
+        decline:  { title: 'Decline Request', message: 'Please tell the requester why this request is being declined.', btn: 'Decline', btnClass: 'btn-danger', required: true,
+                    success: 'Request declined.' },
+        ready:    { title: 'Mark as Ready to Claim', message: 'The requester will see this document as ready to claim.', btn: 'Mark Ready', btnClass: 'btn-primary', required: false,
+                    success: 'Document marked as ready to claim!' },
+        complete: { title: 'Complete Request', message: 'Mark this request as completed?', btn: 'Complete', btnClass: 'btn-success', required: false,
+                    success: 'Request completed successfully!' }
+    };
+
+    let pendingRequestId = null;
+    let pendingAction = null;
+
+    // Opens the remarks modal. Remarks are optional, except when declining.
+    function updateRequest(requestId, action) {
+        const cfg = actionConfig[action];
+        pendingRequestId = requestId;
+        pendingAction = action;
+
+        $('#remarksModalTitle').text(cfg.title);
+        $('#remarksModalMessage').text(cfg.message);
+        $('#remarksLabel').html(cfg.required
+            ? 'Remarks <span class="text-danger">(required)</span>'
+            : 'Remarks (optional)');
+        $('#remarksText').val('').removeClass('is-invalid');
+        $('#remarksError').hide();
+        $('#remarksSubmitBtn')
+            .removeClass('btn-primary btn-success btn-danger')
+            .addClass(cfg.btnClass)
+            .text(cfg.btn)
+            .prop('disabled', false);
+
+        $('#remarksModal').modal('show');
+    }
+
+    function submitRemarks() {
+        const cfg = actionConfig[pendingAction];
+        const remarks = $('#remarksText').val().trim();
+
+        if (cfg.required && !remarks) {
+            $('#remarksText').addClass('is-invalid');
+            $('#remarksError').show();
+            return;
+        }
+
+        $('#remarksSubmitBtn').prop('disabled', true);
+
+        $.ajax({
+            url: `/api/request/update/${pendingRequestId}`,
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ action: pendingAction, remarks: remarks }),
+            success: function(resp) {
+                if (resp.success) {
+                    $('#remarksModal').modal('hide');
+                    alert(cfg.success);
+                    loadRequests();
+                }
+            },
+            error: function(xhr) {
+                const msg = (xhr.responseJSON && xhr.responseJSON.message) || "Failed to update request.";
+                alert(msg);
+                $('#remarksSubmitBtn').prop('disabled', false);
+            }
+        });
+    }
+
+    function applyFilters() {
+        const status = $('#filterStatus').val();
+        const docType = $('#filterDocType').val();
+        const dateFrom = $('#filterDateFrom').val();
+        const dateTo = $('#filterDateTo').val();
+        const searchText = $('#searchText').val().toLowerCase();
+
+        filteredData = allRequestsData.filter(req => {
+            if (status && req.status !== status) return false;
+            if (docType && req.document_type_name !== docType) return false;
+
+            // request_date_iso is YYYY-MM-DD, same format as the date inputs
+            if (dateFrom && req.request_date_iso < dateFrom) return false;
+            if (dateTo && req.request_date_iso > dateTo) return false;
+
+            if (searchText) {
+                const match = (req.user_name || '').toLowerCase().includes(searchText)
+                    || (req.reason || '').toLowerCase().includes(searchText)
+                    || (req.request_id || '').toLowerCase().includes(searchText)
+                    || (req.remarks || '').toLowerCase().includes(searchText);
+                if (!match) return false;
+            }
+
+            return true;
+        });
+
+        renderTable();
+    }
+
+    function clearFilters() {
+        $('#filterStatus').val('');
+        $('#filterDocType').val('');
+        $('#filterDateFrom').val('');
+        $('#filterDateTo').val('');
+        $('#searchText').val('');
+        filteredData = allRequestsData;
+        renderTable();
+    }
+
+    function exportToCSV() {
+        const headers = ['Request ID', 'Requester', 'Document Type', 'Reason', 'Status', 'Date Requested', 'Remarks', 'Feedback'];
+        const rows = filteredData.map(req => [
+            req.request_id,
+            req.user_name,
+            req.document_type_name,
+            req.reason,
+            req.status,
+            req.request_date_formatted,
+            req.remarks || '',
+            feedbackText(req)
+        ]);
+
+        const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        let csv = headers.map(q).join(',') + '\n';
+        rows.forEach(row => {
+            csv += row.map(q).join(',') + '\n';
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Document_Requests_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+        
+        // Add title
+        doc.setFontSize(18);
+        doc.setTextColor(40);
+        doc.text('Document Requests Report', 14, 22);
+        
+        // Add subtitle with date
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        })}`, 14, 30);
+        
+        // Add summary statistics
+        if (filteredData.length > 0) {
+            const statusCounts = filteredData.reduce((acc, req) => {
+                acc[req.status] = (acc[req.status] || 0) + 1;
+                return acc;
+            }, {});
+            
+            let summaryText = `Total Requests: ${filteredData.length}`;
+            const statusTexts = Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`);
+            if (statusTexts.length > 0) {
+                summaryText += ' | ' + statusTexts.join(' | ');
+            }
+            
+            doc.setFontSize(10);
+            doc.text(summaryText, 14, 37);
+        }
+        
+        // Prepare table data
+        const tableData = filteredData.map(req => [
+            req.request_id,
+            req.user_name,
+            req.document_type_name,
+            truncate(req.reason, 60),
+            req.status,
+            req.request_date_formatted,
+            req.remarks || '',
+            feedbackText(req)
+        ]);
+        
+        // Generate table
+        doc.autoTable({
+            head: [['Request ID', 'Requester', 'Document Type', 'Reason', 'Status', 'Date', 'Remarks', 'Feedback']],
+            body: tableData,
+            startY: 45,
+            theme: 'striped',
+            headStyles: {
+                fillColor: [28, 200, 138], // Green color matching your theme
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            styles: {
+                fontSize: 9,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { cellWidth: 24, halign: 'center' },
+                1: { cellWidth: 32 },
+                2: { cellWidth: 30 },
+                3: { cellWidth: 45 },
+                4: { cellWidth: 24, halign: 'center' },
+                5: { cellWidth: 28, halign: 'center' },
+                6: { cellWidth: 40 },
+                7: { cellWidth: 40 }
+            },
+            margin: { top: 45, left: 14, right: 14 },
+            didDrawPage: function(data) {
+                // Footer
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(
+                    'Upper Paatan High School - Document Request Management System',
+                    data.settings.margin.left,
+                    doc.internal.pageSize.height - 10
+                );
+                doc.text(
+                    `Page ${doc.internal.getNumberOfPages()}`,
+                    doc.internal.pageSize.width - 30,
+                    doc.internal.pageSize.height - 10
+                );
+            }
+        });
+        
+        // Save the PDF
+        doc.save(`UPHS_Document_Requests_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+    </script>
 </body>
 </html>
