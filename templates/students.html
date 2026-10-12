@@ -553,12 +553,26 @@ function getRegistrationStatus(s) {
     return 'No';
 }
 
-// Returns the birthday for display, falling back to 'N/A'.
-function getBirthday(s) {
-    return (s.birthday || '').toString().trim() || 'N/A';
+// Converts a stored birthday (YYYY-MM-DD) to mm/dd/yyyy for display.
+// Falls back to the original text if it isn't in the expected format,
+// and to 'N/A' if empty.
+function formatBirthdayDisplay(value) {
+    const v = (value || '').toString().trim();
+    if (!v || v === 'N/A') return 'N/A';
+
+    const match = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+        return `${match[2]}/${match[3]}/${match[1]}`;
+    }
+    return v; // unknown format: show as-is rather than breaking
 }
 
-// Normalizes many date formats to YYYY-MM-DD.
+// Returns the birthday for display (mm/dd/yyyy), falling back to 'N/A'.
+function getBirthday(s) {
+    return formatBirthdayDisplay(s.birthday);
+}
+
+// Normalizes many date formats to YYYY-MM-DD (storage format).
 function normalizeBirthday(value) {
     const v = (value || '').toString().trim();
     if (!v) return '';
