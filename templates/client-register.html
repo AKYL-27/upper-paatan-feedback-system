@@ -166,16 +166,6 @@ body::before {
     box-shadow: 0 0 0 0.2rem rgba(28, 200, 138, 0.15);
 }
 
-/* Date input: keep the empty state looking like a placeholder */
-input[type="date"].form-control {
-    min-height: 3rem;
-    cursor: pointer;
-}
-
-input[type="date"].form-control:invalid {
-    color: var(--placeholder-color);
-}
-
 /* Selects */
 select.form-control {
     appearance: none;
@@ -418,9 +408,11 @@ select.form-control option[disabled] {
                             <label for="birthday">Birthday</label>
                             <div class="input-wrapper" id="birthdayWrapper">
                                 <i class="fas fa-birthday-cake input-icon"></i>
-                                <input type="date" class="form-control" id="birthday" name="birthday" required>
+                                <input type="text" class="form-control" id="birthday" name="birthday"
+                                       placeholder="mm/dd/yyyy" inputmode="numeric" maxlength="10"
+                                       autocomplete="bday" required>
                             </div>
-                            <div class="field-error" id="birthdayError">Please enter a valid birthday that is not in the future.</div>
+                            <div class="field-error" id="birthdayError">Please enter a valid birthday (mm/dd/yyyy) that is not in the future.</div>
                         </div>
 
                         <!--<div class="form-group">
@@ -536,34 +528,65 @@ const birthdayInput = document.getElementById('birthday');
 const birthdayWrapper = document.getElementById('birthdayWrapper');
 const birthdayError = document.getElementById('birthdayError');
 
-// Don't allow future dates in the picker (local date, YYYY-MM-DD)
-(function setBirthdayMax() {
-    const t = new Date();
-    const mm = String(t.getMonth() + 1).padStart(2, '0');
-    const dd = String(t.getDate()).padStart(2, '0');
-    birthdayInput.max = `${t.getFullYear()}-${mm}-${dd}`;
-})();
+// Parses mm/dd/yyyy into a Date, or returns null if it isn't a real date
+// (rejects things like 02/31/2010).
+function parseBirthday(value) {
+    const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    const month = +m[1], day = +m[2], year = +m[3];
+    const d = new Date(year, month - 1, day);
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+    return d;
+}
+
+function clearBirthdayState() {
+    birthdayWrapper.classList.remove('is-invalid', 'is-valid');
+    birthdayError.classList.remove('show');
+}
 
 function validateBirthday() {
-    const value = birthdayInput.value;
+    const value = birthdayInput.value.trim();
     if (!value) {
-        birthdayWrapper.classList.remove('is-invalid', 'is-valid');
-        birthdayError.classList.remove('show');
+        clearBirthdayState();
         return false;
     }
-    if (value > birthdayInput.max) {
+
+    const d = parseBirthday(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!d || d > today || d.getFullYear() < 1900) {
         birthdayWrapper.classList.add('is-invalid');
         birthdayWrapper.classList.remove('is-valid');
         birthdayError.classList.add('show');
         return false;
     }
+
     birthdayWrapper.classList.remove('is-invalid');
     birthdayWrapper.classList.add('is-valid');
     birthdayError.classList.remove('show');
     return true;
 }
 
-birthdayInput.addEventListener('change', validateBirthday);
+// Auto-format while typing: digits only, slashes inserted automatically
+birthdayInput.addEventListener('input', function () {
+    const digits = this.value.replace(/\D/g, '').slice(0, 8);
+    let out = digits;
+    if (digits.length > 4) {
+        out = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+    } else if (digits.length > 2) {
+        out = digits.slice(0, 2) + '/' + digits.slice(2);
+    }
+    this.value = out;
+
+    if (out.length === 10) {
+        validateBirthday();
+    } else {
+        clearBirthdayState();
+    }
+});
+
+birthdayInput.addEventListener('blur', validateBirthday);
 
 function validatePassword() {
     const value = passwordInput.value;
