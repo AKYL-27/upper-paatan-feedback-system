@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime, timedelta
@@ -56,6 +57,15 @@ document_requests_collection = db["document_requests"]
 feedback_collection = db["feedback"]
 document_types_collection = db["document_types"]
 master_students_collection = db["master_students"]  # imported roster (master list)
+
+# Unique index on email so two simultaneous registrations can't create duplicates.
+# Wrapped in try/except: if duplicate emails already exist in the database,
+# MongoDB refuses to build the index. The app still works; the application-level
+# check in is_already_registered() continues to protect against duplicates.
+try:
+    users_collection.create_index("email", unique=True)
+except Exception as e:
+    print(f"WARNING: could not create unique index on users.email: {e}")
 
 print(f"Connected to database: {DB_NAME}")
 
@@ -491,6 +501,11 @@ def _normalize(value):
     return " ".join((value or "").strip().lower().split())
 
 
+def _name_pattern(parts):
+    """Case-insensitive, whitespace-tolerant regex for a list of name parts."""
+    return r"^\s*" + r"\s+".join(re.escape(p) for p in parts) + r"\s*$"
+
+
 def is_in_master_list(first_name, last_name):
     """True if first + last name matches a row in the imported master list
     (case-insensitive, ignoring extra spaces)."""
@@ -499,10 +514,28 @@ def is_in_master_list(first_name, last_name):
     if not parts:
         return False
 
-    pattern = r"^\s*" + r"\s+".join(re.escape(p) for p in parts) + r"\s*$"
     return master_students_collection.find_one(
-        {"full_name": {"$regex": pattern, "$options": "i"}}
+        {"full_name": {"$regex": _name_pattern(parts), "$options": "i"}}
     ) is not None
+
+
+def is_already_registered(first_name, last_name, email):
+    """True if a user account already exists with this email, or a client
+    account already exists with the same first + last name
+    (case-insensitive, ignoring extra spaces)."""
+    if email and users_collection.find_one({"email": email}):
+        return True
+
+    first_parts = first_name.split()
+    last_parts = last_name.split()
+    if not first_parts or not last_parts:
+        return False
+
+    return users_collection.find_one({
+        "role": "client",
+        "firstname": {"$regex": _name_pattern(first_parts), "$options": "i"},
+        "lastname": {"$regex": _name_pattern(last_parts), "$options": "i"},
+    }) is not None
 
 
 @app.route("/api/registered-accounts")
@@ -868,36 +901,39 @@ def client_register():
         password = request.form.get("password")
         confirm_password = request.form.get("confirm_password")
         birthday = request.form.get("birthday", "").strip()
+
+        # NOTE: School Year / Year Level / Section are commented out in
+        # client-register.html, so they are optional here. If you re-enable
+        # those fields in the form, they will be saved automatically.
         school_year = request.form.get("school_year", "").strip()
         year = request.form.get("year", "").strip()
         section = request.form.get("section", "").strip()
 
-        # DEBUG: confirm what the server actually received from the form
-        print("DEBUG - form data received:", {
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": email,
-            "birthday": birthday,
-            "school_year": school_year,
-            "year": year,
-            "section": section
-        })
-
         # basic validation
-        if not first_name or not last_name or not email or not password or not confirm_password or not birthday or not school_year or not year or not section:
+        if not first_name or not last_name or not email or not password or not confirm_password or not birthday:
             flash("All fields are required.", "danger")
             return redirect(url_for("client_register"))
 
-        # birthday must be a valid date (YYYY-MM-DD) and not in the future
-        try:
-            birthday_date = datetime.strptime(birthday, "%Y-%m-%d")
-        except ValueError:
-            flash("Please enter a valid birthday.", "danger")
+        # birthday is typed as mm/dd/yyyy (YYYY-MM-DD is also accepted) and must
+        # be a real date that is not in the future
+        birthday_date = None
+        for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+            try:
+                birthday_date = datetime.strptime(birthday, fmt)
+                break
+            except ValueError:
+                continue
+
+        if birthday_date is None:
+            flash("Please enter a valid birthday (mm/dd/yyyy).", "danger")
             return redirect(url_for("client_register"))
 
         if birthday_date.date() > datetime.now().date():
             flash("Birthday cannot be in the future.", "danger")
             return redirect(url_for("client_register"))
+
+        # Always store as YYYY-MM-DD so the Master List page and imports keep working
+        birthday = birthday_date.strftime("%Y-%m-%d")
 
         # server-side password confirmation (client-side JS can be bypassed)
         if password != confirm_password:
@@ -908,30 +944,42 @@ def client_register():
             flash("Password must be at least 8 characters.", "danger")
             return redirect(url_for("client_register"))
 
+        # block duplicate accounts (same email OR same student name)
+        if is_already_registered(first_name, last_name, email):
+            flash("Account Already Registered", "danger")
+            return redirect(url_for("client_register"))
+
         # block registration if the student is not in the master list
         if not is_in_master_list(first_name, last_name):
             flash("Your name was not found in the school's master list. "
                   "Please contact the school administrator.", "danger")
             return redirect(url_for("client_register"))
 
-        # check email exists
-        if users_collection.find_one({"email": email}):
-            flash("Email already exists", "danger")
-            return redirect(url_for("client_register"))
-
         hashed = generate_password_hash(password)
 
-        users_collection.insert_one({
+        new_user = {
             "firstname": first_name,
             "lastname": last_name,
             "email": email,
             "password": hashed,
             "role": "client",
             "birthday": birthday,
-            "school_year": school_year,
-            "year": year,
-            "section": section
-        })
+        }
+
+        # Only store these if the form actually provided them
+        if school_year:
+            new_user["school_year"] = school_year
+        if year:
+            new_user["year"] = year
+        if section:
+            new_user["section"] = section
+
+        try:
+            users_collection.insert_one(new_user)
+        except DuplicateKeyError:
+            # Two submissions raced past the check above; the unique index caught it.
+            flash("Account Already Registered", "danger")
+            return redirect(url_for("client_register"))
 
         flash("Account created successfully. Please login.", "success")
         return redirect(url_for("client_login"))
@@ -1051,9 +1099,24 @@ def change_client_password():
 def client_home():
     return render_template("client-home.html")
 
+def get_logged_in_client_name():
+    """Full name of the logged-in client, straight from their account.
+    Returns None if nobody is logged in or the account no longer exists."""
+    if "client_user_id" not in session:
+        return None
+    user = users_collection.find_one({"_id": ObjectId(session["client_user_id"])})
+    if not user:
+        return None
+    return f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+
+
 @app.route("/client/request-document")
 def client_request_document():
-    return render_template("request-document.html")
+    full_name = get_logged_in_client_name()
+    if not full_name:
+        flash("Please login to request a document.", "warning")
+        return redirect(url_for("client_login"))
+    return render_template("request-document.html", full_name=full_name)
 
 @app.route("/submit-request", methods=["POST"])
 def submit_request():
@@ -1062,8 +1125,9 @@ def submit_request():
         flash("Please login to submit a request.", "danger")
         return redirect(url_for("client_login"))
 
-    # Get form data
-    name = request.form.get("name", "").strip()
+    # The student name always comes from the logged-in account, never from the
+    # form (a readonly input can still be edited through browser dev tools).
+    name = get_logged_in_client_name()
     document_type = request.form.get("document_type", "").strip()
     reason = request.form.get("reason", "").strip()
 
