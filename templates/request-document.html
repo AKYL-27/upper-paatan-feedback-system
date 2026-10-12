@@ -189,7 +189,7 @@ select.form-control option {
 
 .btn-submit:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(28, 200, 138, 0.3);
+    box-shadow: 0 4px 15px rgba(217, 233, 227, 0.3);
 }
 
 .action-buttons {
@@ -275,6 +275,17 @@ select.form-control option {
     text-align: right;
     margin-top: 0.3rem;
 }
+
+input[readonly].form-control {
+    background-color: #f1f3f5;
+    color: #495057;
+    cursor: not-allowed;
+}
+
+input[readonly].form-control:focus {
+    border-color: #e0e0e0;
+    box-shadow: none;
+}
 </style>
 </head>
 
@@ -322,7 +333,7 @@ select.form-control option {
                         Student Full Name
                         <span class="required-mark">*</span>
                     </label>
-                    <input type="text" id="fullName" name="name" class="form-control" placeholder="Enter your complete name" required>
+<input type="text" id="fullName" class="form-control" value="{{ full_name }}" readonly>
                 </div>
 
                 <!-- Document Information Section -->
