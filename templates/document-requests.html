@@ -13,6 +13,9 @@
     <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
 
     <style>
+        .star-filled { color: #f6c23e; }  /* gold */
+        .star-empty  { color: #d1d3e2; }  /* gray, uncolored */
+
         .bg-gradient-primary {
             background-color: #1cc88a;
             background-image: linear-gradient(180deg, #1cc88a 10%, #13855c 100%);
@@ -339,6 +342,13 @@
 
     $(document).ready(function() {
         loadRequests();
+
+        // Pick up new feedback without a manual reload:
+        // every 30 seconds, and whenever the admin returns to this tab.
+        setInterval(loadRequests, 30000);
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) loadRequests();
+        });
     });
 
     // Escape user-supplied text before putting it into innerHTML
@@ -356,12 +366,20 @@
         return text.length > max ? text.substring(0, max) + '...' : text;
     }
 
+    // Loads the list from the server (never cached) and re-applies whatever
+    // filters the admin currently has selected.
     function loadRequests() {
-        $.getJSON("{{ url_for('api_list_requests') }}", function(data) {
+        const keepDocType = $('#filterDocType').val();
+
+        $.ajax({
+            url: "{{ url_for('api_list_requests') }}",
+            dataType: "json",
+            cache: false
+        }).done(function(data) {
             allRequestsData = data;
-            filteredData = data;
             populateDocTypeFilter();
-            renderTable();
+            $('#filterDocType').val(keepDocType);
+            applyFilters();   // re-applies current filters, then renders
         }).fail(function() {
             $("#requestTableBody").html('<tr><td colspan="9" class="text-center text-danger">Error loading data</td></tr>');
         });
@@ -377,13 +395,22 @@
     }
 
     function renderFeedback(req) {
-        if (!req.feedback_rating) return '<span class="text-muted">No feedback</span>';
-        const stars = '★'.repeat(req.feedback_rating) + '☆'.repeat(5 - req.feedback_rating);
+        const rating = Number(req.feedback_rating) || 0;
+
+        // Always draw 5 stars: gold up to the client's rating, gray for the rest.
+        // No feedback for this request (rating 0) means all 5 stars stay gray.
+        let stars = '';
+        for (let i = 1; i <= 5; i++) {
+            stars += `<span class="${i <= rating ? 'star-filled' : 'star-empty'}">★</span>`;
+        }
+
         const comment = req.feedback_comments
             ? `<br><small>${esc(truncate(req.feedback_comments, 40))}</small>`
             : '';
-        return `<span class="text-warning">${stars}</span>${comment}`;
+
+        return `<span style="white-space:nowrap;">${stars}</span>${comment}`;
     }
+
 
     function feedbackText(req) {
         if (!req.feedback_rating) return 'No feedback';
