@@ -227,23 +227,6 @@ body {
     }
 }
 
-/* Confetti animation */
-.confetti {
-    position: fixed;
-    width: 10px;
-    height: 10px;
-    background: var(--primary-green);
-    position: absolute;
-    animation: confetti-fall 3s linear infinite;
-}
-
-@keyframes confetti-fall {
-    to {
-        transform: translateY(100vh) rotate(360deg);
-        opacity: 0;
-    }
-}
-
 /* Responsive */
 @media (max-width: 768px) {
     .success-header {
@@ -342,26 +325,6 @@ body {
 // setTimeout(function() {
 //     window.location.href = "{{ url_for('client_home') }}";
 // }, 10000);
-
-// Add some celebratory confetti effect
-function createConfetti() {
-    const colors = ['#1cc88a', '#f6c23e', '#4e73df', '#e74a3b'];
-    for (let i = 0; i < 50; i++) {
-        setTimeout(() => {
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
-            confetti.style.left = Math.random() * 100 + '%';
-            confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
-            confetti.style.animationDelay = Math.random() * 3 + 's';
-            document.body.appendChild(confetti);
-            
-            setTimeout(() => confetti.remove(), 3000);
-        }, i * 30);
-    }
-}
-
-// Trigger confetti on page load
-window.addEventListener('load', createConfetti);
 </script>
 
 </body>
