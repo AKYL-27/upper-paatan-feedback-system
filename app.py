@@ -421,13 +421,11 @@ def api_update_request(request_id):
 def api_list_requests():
     requests = list(document_requests_collection.find().sort("request_date", -1))
 
-    # Latest feedback per user (feedback is not linked to a specific request,
-    # so we show the most recent feedback submitted by the same requester).
-    latest_feedback = {}
-    for fb in feedback_collection.find({"user_id": {"$ne": None}}).sort("date_submitted", -1):
-        uid = fb["user_id"]
-        if uid not in latest_feedback:  # first one seen = newest
-            latest_feedback[uid] = fb
+    # Feedback is matched strictly to the request it was submitted for.
+    # Sorted oldest -> newest so that, if several exist, the newest wins.
+    feedback_by_request = {}
+    for fb in feedback_collection.find({"request_id": {"$ne": None}}).sort("date_submitted", 1):
+        feedback_by_request[fb["request_id"]] = fb
 
     result = []
 
@@ -450,8 +448,8 @@ def api_list_requests():
         request_date_formatted = request_date.strftime("%B %d, %Y") if request_date else "N/A"
         request_date_iso = request_date.strftime("%Y-%m-%d") if request_date else ""
 
-        # Feedback from this requester
-        fb = latest_feedback.get(req.get("user_id"))
+        # Only feedback that belongs to THIS request (no fallback to other requests)
+        fb = feedback_by_request.get(req["_id"])
 
         result.append({
             "_id": str(req["_id"]),
@@ -469,7 +467,10 @@ def api_list_requests():
             "request_date_iso": request_date_iso
         })
 
-    return jsonify(result)
+    resp = jsonify(result)
+    # Make sure the browser never serves a cached copy of this list
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 @app.route("/api/list-feedbacks")
 def api_list_feedbacks():
@@ -1170,8 +1171,18 @@ def client_request_status():
         "user_id": user_id
     }).sort("request_date", -1))   # newest first
 
+    # Requests this user has already left feedback for
+    reviewed_ids = {
+        fb["request_id"]
+        for fb in feedback_collection.find(
+            {"user_id": user_id, "request_id": {"$ne": None}},
+            {"request_id": 1}
+        )
+    }
+
     # Normalize fields for template
     for r in requests:
+        r["has_feedback"] = r["_id"] in reviewed_ids   # must run BEFORE _id is stringified
         r["request_id"] = format_request_id(r["_id"])  # same ID the admin sees
         r["_id"] = str(r["_id"])   # convert ObjectId to string
         r["created_at"] = r.get("request_date")  # match your HTML
@@ -1190,14 +1201,64 @@ def client_feedback():
 
     user_id = session["client_user_id"]
     user = users_collection.find_one({"_id": ObjectId(user_id)})
+    user_name = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+
+    # Request id comes from ?request=... (GET, via the "Give Feedback" button)
+    # or from the hidden form input named request_id (POST).
+    raw_request_id = request.values.get("request_id") or request.args.get("request") or ""
+    linked_request_id = None
+    if raw_request_id:
+        try:
+            # Make sure the request exists and belongs to this user
+            req_doc = document_requests_collection.find_one({
+                "_id": ObjectId(raw_request_id),
+                "user_id": ObjectId(user_id)
+            })
+            if req_doc:
+                linked_request_id = req_doc["_id"]
+        except Exception:
+            pass
+
+    # Fallback: if the form didn't send a (valid) request id, link the feedback
+    # to this user's newest request that has no feedback yet, so the admin
+    # table can always show the stars for it.
+    if not linked_request_id:
+        already_reviewed = feedback_collection.distinct(
+            "request_id",
+            {"user_id": ObjectId(user_id), "request_id": {"$ne": None}}
+        )
+        latest_req = document_requests_collection.find_one(
+            {"user_id": ObjectId(user_id), "_id": {"$nin": already_reviewed}},
+            sort=[("request_date", -1)]
+        )
+        if latest_req:
+            linked_request_id = latest_req["_id"]
 
     if request.method == "POST":
-        rating = int(request.form.get("rating", 0))
+        try:
+            rating = int(request.form.get("rating", 0))
+        except ValueError:
+            rating = 0
         comments = request.form.get("comments", "")
+
+        # A rating of 1-5 is required, otherwise the stars would stay gray
+        if rating < 1 or rating > 5:
+            flash("Please select a rating.", "danger")
+            if raw_request_id:
+                return redirect(url_for("client_feedback", request=raw_request_id))
+            return redirect(url_for("client_feedback"))
+
+        # One feedback per request
+        if linked_request_id and feedback_collection.find_one({
+            "user_id": ObjectId(user_id), "request_id": linked_request_id
+        }):
+            flash("You already submitted feedback for this request.", "info")
+            return redirect(url_for("client_request_status"))
 
         new_feedback = {
             "user_id": ObjectId(user_id),
-            "user_name": f"{user.get('firstname','')} {user.get('lastname','')}".strip(),
+            "request_id": linked_request_id,   # None if given without a request
+            "user_name": user_name,
             "rating": rating,
             "comments": comments,
             "date_submitted": datetime.now(),
@@ -1207,7 +1268,11 @@ def client_feedback():
         flash("Thank you for your feedback!", "success")
         return redirect(url_for("client_feedback_thank_you"))
 
-    return render_template("client-feedback.html", user_name=f"{user.get('firstname','')} {user.get('lastname','')}".strip())
+    return render_template(
+        "client-feedback.html",
+        user_name=user_name,
+        request_id=str(linked_request_id) if linked_request_id else ""
+    )
 
 @app.route("/client/logout")
 def client_logout():
