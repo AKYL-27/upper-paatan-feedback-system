@@ -252,6 +252,37 @@
             font-size: 0.85rem;
         }
 
+        /* Feedback column */
+        .btn-feedback {
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 20px;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-feedback:hover {
+            background: var(--dark-green);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(28, 200, 138, 0.3);
+            text-decoration: none;
+        }
+
+        .feedback-done {
+            color: var(--dark-green);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
         .filter-section {
             padding: 1.25rem;
             background: #f8f9fc;
@@ -409,6 +440,7 @@
                             <th>Status</th>
                             <th>Date Requested</th>
                             <th>Remarks</th>
+                            <th>Feedback</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -463,6 +495,20 @@
                             <td>
                                 {% if r.remarks %}
                                     <span class="remarks-text">{{ r.remarks }}</span>
+                                {% else %}
+                                    <span class="text-muted">&mdash;</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {# Feedback is only offered once the request is Completed. #}
+                                {# To show the button for every request, remove this status check. #}
+                                {% if r.status == "Completed" %}
+                                    {% if r.has_feedback %}
+                                        <span class="feedback-done">
+                                            <i class="fas fa-check-circle me-1"></i>Submitted
+                                        </span>
+                                    {% else %}
+   <a href="{{ url_for('client_feedback', request=r._id) }}">Give Feedback</a>                                    {% endif %}
                                 {% else %}
                                     <span class="text-muted">&mdash;</span>
                                 {% endif %}
