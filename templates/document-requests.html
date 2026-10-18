@@ -71,6 +71,57 @@
             background-color: #4e73df;
             color: white;
         }
+
+        /* Clickable feedback cell */
+        .feedback-cell {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .feedback-cell:hover {
+            background-color: #f0fbf6;
+        }
+        .feedback-cell .view-hint {
+            display: block;
+            font-size: 0.72rem;
+            color: #13855c;
+            margin-top: 2px;
+        }
+
+        /* Feedback details modal */
+        .detail-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #858796;
+            margin-bottom: 2px;
+        }
+        .detail-value {
+            color: #3a3b45;
+            margin-bottom: 14px;
+            word-break: break-word;
+        }
+        .feedback-box {
+            background: #f8f9fc;
+            border-left: 4px solid #1cc88a;
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .feedback-stars {
+            font-size: 1.6rem;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .feedback-comment {
+            background: #fff;
+            border: 1px solid #e3e6f0;
+            border-radius: 6px;
+            padding: 12px;
+            white-space: pre-wrap;      /* keep the user's line breaks */
+            word-break: break-word;
+            max-height: 260px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 
@@ -326,6 +377,28 @@
         </div>
     </div>
 
+    <!-- Feedback Details Modal -->
+    <div class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalTitle">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="feedbackModalTitle">
+                        <i class="fas fa-comment-dots text-success mr-2"></i>Feedback Details
+                    </h5>
+                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="feedbackModalBody">
+                    <!-- filled in by showFeedback() -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
@@ -394,27 +467,126 @@
         });
     }
 
-    function renderFeedback(req) {
-        const rating = Number(req.feedback_rating) || 0;
-
-        // Always draw 5 stars: gold up to the client's rating, gray for the rest.
-        // No feedback for this request (rating 0) means all 5 stars stay gray.
+    // Draws 5 stars: gold up to the rating, gray for the rest.
+    function starsHtml(rating) {
+        rating = Number(rating) || 0;
         let stars = '';
         for (let i = 1; i <= 5; i++) {
             stars += `<span class="${i <= rating ? 'star-filled' : 'star-empty'}">★</span>`;
         }
+        return stars;
+    }
+
+    // Status badge, shared by the table and the feedback modal
+    function statusBadgeHtml(status) {
+        switch (status) {
+            case "Pending":        return '<span class="badge badge-warning">Pending</span>';
+            case "On Process":     return '<span class="badge badge-on-process">On Process</span>';
+            case "Ready to Claim": return '<span class="badge badge-ready">Ready to Claim</span>';
+            case "Completed":      return '<span class="badge badge-success">Completed</span>';
+            case "Declined":       return '<span class="badge badge-danger">Declined</span>';
+            default:               return `<span class="badge badge-secondary">${esc(status)}</span>`;
+        }
+    }
+
+    function ratingLabel(rating) {
+        return ({1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent'})[rating] || '';
+    }
+
+    function renderFeedback(req) {
+        const rating = Number(req.feedback_rating) || 0;
+        const stars = `<span style="white-space:nowrap;">${starsHtml(rating)}</span>`;
+
+        // No feedback for this request: gray stars, nothing to open.
+        if (!rating) return stars;
 
         const comment = req.feedback_comments
             ? `<br><small>${esc(truncate(req.feedback_comments, 40))}</small>`
             : '';
 
-        return `<span style="white-space:nowrap;">${stars}</span>${comment}`;
+        return `${stars}${comment}<span class="view-hint"><i class="fas fa-eye"></i> View details</span>`;
     }
-
 
     function feedbackText(req) {
         if (!req.feedback_rating) return 'No feedback';
         return `${req.feedback_rating}/5` + (req.feedback_comments ? ` - ${req.feedback_comments}` : '');
+    }
+
+    // Opens the modal with the complete request + feedback details
+    function showFeedback(requestId) {
+        const req = allRequestsData.find(r => r._id === requestId);
+        if (!req || !req.feedback_rating) return;
+
+        const rating = Number(req.feedback_rating);
+        const comment = (req.feedback_comments || '').trim();
+
+        const html = `
+            <h6 class="font-weight-bold text-success mb-3">
+                <i class="fas fa-file-alt mr-1"></i> Request Information
+            </h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="detail-label">Request ID</div>
+                    <div class="detail-value"><strong>${esc(req.request_id)}</strong></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">${statusBadgeHtml(req.status)}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Requester</div>
+                    <div class="detail-value">${esc(req.user_name)}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Student Name</div>
+                    <div class="detail-value">${esc(req.student_name)}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Document Type</div>
+                    <div class="detail-value">${esc(req.document_type_name)}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Date Requested</div>
+                    <div class="detail-value">${esc(req.request_date_formatted)}</div>
+                </div>
+                <div class="col-12">
+                    <div class="detail-label">Purpose</div>
+                    <div class="detail-value">${req.reason ? esc(req.reason) : '<span class="text-muted">—</span>'}</div>
+                </div>
+                <div class="col-12">
+                    <div class="detail-label">Admin Remarks</div>
+                    <div class="detail-value">${req.remarks ? esc(req.remarks) : '<span class="text-muted">—</span>'}</div>
+                </div>
+            </div>
+
+            <hr>
+
+            <h6 class="font-weight-bold text-success mb-3">
+                <i class="fas fa-star mr-1"></i> Feedback
+            </h6>
+            <div class="feedback-box">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="detail-label">Rating</div>
+                        <div class="detail-value mb-2">
+                            <div class="feedback-stars">${starsHtml(rating)}</div>
+                            <div class="mt-1"><strong>${rating} / 5</strong> &ndash; ${esc(ratingLabel(rating))}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-label">Submitted By</div>
+                        <div class="detail-value mb-2">${esc(req.user_name)}</div>
+                        <div class="detail-label">Date Submitted</div>
+                        <div class="detail-value mb-2">${req.feedback_date ? esc(req.feedback_date) : '<span class="text-muted">—</span>'}</div>
+                    </div>
+                </div>
+                <div class="detail-label">Comments</div>
+                <div class="feedback-comment">${comment ? esc(comment) : '<span class="text-muted">No comment provided.</span>'}</div>
+            </div>
+        `;
+
+        $('#feedbackModalBody').html(html);
+        $('#feedbackModal').modal('show');
     }
 
     function renderTable() {
@@ -427,27 +599,7 @@
         }
 
         filteredData.forEach(function(req) {
-            // Status badge
-            let statusBadge = '';
-            switch(req.status) {
-                case "Pending":
-                    statusBadge = '<span class="badge badge-warning">Pending</span>';
-                    break;
-                case "On Process":
-                    statusBadge = '<span class="badge badge-on-process">On Process</span>';
-                    break;
-                case "Ready to Claim":
-                    statusBadge = '<span class="badge badge-ready">Ready to Claim</span>';
-                    break;
-                case "Completed":
-                    statusBadge = '<span class="badge badge-success">Completed</span>';
-                    break;
-                case "Declined":
-                    statusBadge = '<span class="badge badge-danger">Declined</span>';
-                    break;
-                default:
-                    statusBadge = `<span class="badge badge-secondary">${esc(req.status)}</span>`;
-            }
+            const statusBadge = statusBadgeHtml(req.status);
 
             // Action buttons based on status
             let actionButtons = '';
@@ -477,6 +629,12 @@
                     actionButtons = `<span class="text-muted">No actions</span>`;
             }
 
+            // Only cells that actually have feedback are clickable
+            const hasFeedback = Number(req.feedback_rating) > 0;
+            const feedbackCellAttrs = hasFeedback
+                ? `class="feedback-cell" title="Click to view feedback details" onclick="showFeedback('${req._id}')"`
+                : '';
+
             tbody.append(`
                 <tr>
                     <td><strong>${esc(req.request_id)}</strong></td>
@@ -486,7 +644,7 @@
                     <td>${statusBadge}</td>
                     <td>${esc(req.request_date_formatted)}</td>
                     <td>${req.remarks ? esc(req.remarks) : '<span class="text-muted">—</span>'}</td>
-                    <td>${renderFeedback(req)}</td>
+                    <td ${feedbackCellAttrs}>${renderFeedback(req)}</td>
                     <td>${actionButtons}</td>
                 </tr>
             `);
