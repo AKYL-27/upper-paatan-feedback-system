@@ -102,6 +102,33 @@
             font-weight: bold;
             color: #5a5c69;
         }
+
+        /* Request ID tag (same look as the request list) */
+        .request-id-tag {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #13855c;
+            background: #e7f9f2;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        /* Shown when feedback isn't tied to any request */
+        .no-request-tag {
+            font-size: 0.78rem;
+            color: #6c757d;
+            background: #eaecf4;
+            padding: 0.25rem 0.55rem;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        .modal-message {
+            white-space: pre-wrap;      /* keep the user's line breaks */
+            word-break: break-word;
+        }
     </style>
 
 </head>
@@ -161,7 +188,7 @@
             <li class="nav-item">
                 <a class="nav-link" href="students">
                     <i class="fas fa-fw fa-user-graduate"></i>
-                    <span>Master List</span></a>
+                    <span>Registered Students</span></a>
             </li>
 
 
@@ -303,7 +330,7 @@
                             
                             <div class="filter-item">
                                 <label for="searchText">Search</label>
-                                <input type="text" id="searchText" class="form-control" placeholder="Search by name or comment...">
+                                <input type="text" id="searchText" class="form-control" placeholder="Search by request ID, name or comment...">
                             </div>
                             
                             <div>
@@ -327,7 +354,7 @@
                                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                                     <thead>
                                         <tr>
-                                            <th>#</th>
+                                            <th>Request ID</th>
                                             <th>User / Visitor</th>
                                             <th>⭐ Rating</th>
                                             <th>Message</th>
@@ -338,7 +365,7 @@
                                     </thead>
                                     <tbody id="feedbackTableBody">
                                         <tr>
-                                            <td colspan="7" class="text-center">Loading...</td>
+                                            <td colspan="6" class="text-center">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -432,9 +459,33 @@
 let allFeedbackData = [];
 let filteredData = [];
 
+// Shown wherever a feedback isn't tied to a document request
+// (visitor feedback, or older feedback saved without a request).
+const NO_REQUEST_TEXT = 'General feedback';
+
 $(document).ready(function () {
     loadFeedback();
 });
+
+// Escape user-supplied text before putting it into innerHTML
+function esc(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function requestIdHtml(fb) {
+    return fb.request_id
+        ? `<span class="request-id-tag">${esc(fb.request_id)}</span>`
+        : `<span class="no-request-tag" title="Not linked to a document request">${NO_REQUEST_TEXT}</span>`;
+}
+
+function requestIdText(fb) {
+    return fb.request_id || NO_REQUEST_TEXT;
+}
 
 function loadFeedback() {
     $.getJSON("/api/list-feedbacks", function (data) {
@@ -464,35 +515,28 @@ function renderTable() {
     tbody.empty();
 
     if (!filteredData.length) {
-        tbody.append('<tr><td colspan="7" class="text-center">No feedback available</td></tr>');
+        tbody.append('<tr><td colspan="6" class="text-center">No feedback available</td></tr>');
         return;
     }
 
-    filteredData.forEach((fb, index) => {
-        let statusBadge = '';
-        switch(fb.status){
-            case "New": statusBadge = '<span class="badge badge-primary">New</span>'; break;
-            case "Reviewed": statusBadge = '<span class="badge badge-success">Reviewed</span>'; break;
-            default: statusBadge = '<span class="badge badge-secondary">'+fb.status+'</span>';
-        }
-
+    filteredData.forEach(fb => {
         let stars = '⭐'.repeat(fb.rating);
+        const comments = fb.comments || '';
 
         tbody.append(`
         <tr>
-            <td>${index + 1}</td>
-            <td>${fb.user_name}</td>
+            <td>${requestIdHtml(fb)}</td>
+            <td>${esc(fb.user_name)}</td>
             <td>${stars} (${fb.rating})</td>
-            <td>${fb.comments.substring(0, 50)}${fb.comments.length > 50 ? '...' : ''}</td>
-            <td>${fb.date_submitted}</td>
-            <!--<td>${statusBadge}</td>-->
+            <td>${esc(comments.substring(0, 50))}${comments.length > 50 ? '...' : ''}</td>
+            <td>${esc(fb.date_submitted)}</td>
             <td>
-                <button class="btn btn-sm btn-info" onclick='viewDetails(${JSON.stringify(fb)})'>
+                <button class="btn btn-sm btn-info" title="View details" onclick="viewDetails('${fb._id}')">
                     <i class="fas fa-eye"></i>
                 </button>
                 <!--<button class="btn btn-sm btn-danger" onclick="deleteFeedback('${fb._id}')">
-                    <i class="fas fa-trash"></i>-->
-                </button>
+                    <i class="fas fa-trash"></i>
+                </button>-->
             </td>
         </tr>
         `);
@@ -501,7 +545,7 @@ function renderTable() {
 
 function applyFilters() {
     const rating = $('#filterRating').val();
-    const status = $('#filterStatus').val();
+    const status = $('#filterStatus').val();   // undefined while the status filter is commented out
     const dateFrom = $('#filterDateFrom').val();
     const dateTo = $('#filterDateTo').val();
     const searchText = $('#searchText').val().toLowerCase();
@@ -520,11 +564,12 @@ function applyFilters() {
             if (dateTo && fbDate > new Date(dateTo + 'T23:59:59')) return false;
         }
         
-        // Search filter
+        // Search filter (request ID, name, or comment)
         if (searchText) {
-            const nameMatch = fb.user_name.toLowerCase().includes(searchText);
-            const commentMatch = fb.comments.toLowerCase().includes(searchText);
-            if (!nameMatch && !commentMatch) return false;
+            const idMatch = (fb.request_id || '').toLowerCase().includes(searchText);
+            const nameMatch = (fb.user_name || '').toLowerCase().includes(searchText);
+            const commentMatch = (fb.comments || '').toLowerCase().includes(searchText);
+            if (!idMatch && !nameMatch && !commentMatch) return false;
         }
         
         return true;
@@ -545,16 +590,21 @@ function clearFilters() {
     renderTable();
 }
 
-function viewDetails(feedback) {
+function viewDetails(feedbackId) {
+    const feedback = allFeedbackData.find(fb => fb._id === feedbackId);
+    if (!feedback) return;
+
     const stars = '⭐'.repeat(feedback.rating);
+    const message = (feedback.comments || '').trim();
     const modalContent = `
-        <p><strong>Name:</strong> ${feedback.user_name}</p>
+        <p><strong>Request ID:</strong> ${requestIdHtml(feedback)}</p>
+        <p><strong>Name:</strong> ${esc(feedback.user_name)}</p>
         <p><strong>Rating:</strong> ${stars} (${feedback.rating}/5)</p>
-        <p><strong>Date:</strong> ${feedback.date_submitted}</p>
-        <p><strong>Status:</strong> ${feedback.status}</p>
+        <p><strong>Date:</strong> ${esc(feedback.date_submitted)}</p>
+        <p><strong>Status:</strong> ${esc(feedback.status)}</p>
         <hr>
         <p><strong>Full Message:</strong></p>
-        <p>${feedback.comments}</p>
+        <p class="modal-message">${message ? esc(message) : '<span class="text-muted">No message provided.</span>'}</p>
     `;
     $('#modalBody').html(modalContent);
     $('#viewModal').modal('show');
@@ -577,19 +627,21 @@ function deleteFeedback(feedbackId) {
 }
 
 function exportToCSV() {
-    const headers = ['#', 'User', 'Rating', 'Message', 'Date', 'Status'];
-    const rows = filteredData.map((fb, i) => [
-        i + 1,
+    const headers = ['Request ID', 'User', 'Rating', 'Message', 'Date', 'Status'];
+    const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+
+    const rows = filteredData.map(fb => [
+        requestIdText(fb),
         fb.user_name,
         fb.rating,
-        fb.comments.replace(/,/g, ';'),
+        fb.comments || '',
         fb.date_submitted,
         fb.status
     ]);
 
-    let csv = headers.join(',') + '\n';
+    let csv = headers.map(q).join(',') + '\n';
     rows.forEach(row => {
-        csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+        csv += row.map(q).join(',') + '\n';
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -630,18 +682,21 @@ function exportToPDF() {
     }
     
     // Prepare table data
-    const tableData = filteredData.map((fb, index) => [
-        index + 1,
-        fb.user_name,
-        `${fb.rating}/5`,
-        fb.comments.length > 100 ? fb.comments.substring(0, 100) + '...' : fb.comments,
-        fb.date_submitted,
-        fb.status || 'N/A'
-    ]);
+    const tableData = filteredData.map(fb => {
+        const comments = fb.comments || '';
+        return [
+            requestIdText(fb),
+            fb.user_name,
+            `${fb.rating}/5`,
+            comments.length > 100 ? comments.substring(0, 100) + '...' : comments,
+            fb.date_submitted,
+            fb.status || 'N/A'
+        ];
+    });
     
     // Generate table
     doc.autoTable({
-        head: [['#', 'User/Visitor', 'Rating', 'Message', 'Date', 'Status']],
+        head: [['Request ID', 'User/Visitor', 'Rating', 'Message', 'Date', 'Status']],
         body: tableData,
         startY: 45,
         theme: 'striped',
@@ -658,12 +713,12 @@ function exportToPDF() {
             halign: 'left'
         },
         columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 40 },
-            2: { cellWidth: 20, halign: 'center' },
-            3: { cellWidth: 110 },
-            4: { cellWidth: 30, halign: 'center' },
-            5: { cellWidth: 25, halign: 'center' }
+            0: { cellWidth: 28, halign: 'center' },
+            1: { cellWidth: 38 },
+            2: { cellWidth: 18, halign: 'center' },
+            3: { cellWidth: 100 },
+            4: { cellWidth: 34, halign: 'center' },
+            5: { cellWidth: 24, halign: 'center' }
         },
         margin: { top: 45, left: 14, right: 14 },
         didDrawPage: function(data) {
