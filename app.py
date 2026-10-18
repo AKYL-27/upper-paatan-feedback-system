@@ -5,7 +5,7 @@ from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime, timedelta
-import re  
+import re
 import os
 from collections import Counter
 
@@ -88,7 +88,7 @@ def admin_login():
     # If already logged in, redirect to dashboard
     if "admin_user_id" in session:
         return redirect(url_for("admin_dashboard"))
-    
+
     if request.method == "POST":
         email = request.form.get("email", "").lower().strip()
         password = request.form.get("password")
@@ -120,7 +120,7 @@ def admin_login():
         session["admin_user_id"] = str(user["_id"])
         session["admin_user_name"] = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
         session["admin_email"] = user["email"]
-        
+
         # Set session permanent if remember me is checked
         if remember_me:
             session.permanent = True
@@ -145,9 +145,9 @@ def admin_logout():
 def admin_forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").lower().strip()
-        
+
         user = users_collection.find_one({"email": email, "role": "admin"})
-        
+
         if user:
             # Here you would typically send a password reset email
             # For now, just show a success message
@@ -155,9 +155,9 @@ def admin_forgot_password():
         else:
             # Don't reveal if email exists or not for security
             flash("If that email exists in our system, you will receive password reset instructions.", "info")
-        
+
         return redirect(url_for("admin_login"))
-    
+
     return render_template("admin-forgot-password.html")
 
 # -----------------------------
@@ -168,13 +168,13 @@ def admin_forgot_password():
 def admin_profile():
     if "admin_user_id" not in session:  # Changed from "user_id"
         return redirect(url_for("admin_login"))
-    
+
     user_id = session["admin_user_id"]  # Changed from "user_id"
     user = users_collection.find_one({"_id": ObjectId(user_id)})
-    
+
     if not user:
         return redirect(url_for("admin_login"))
-    
+
     return render_template("profile.html", user=user)
 
 
@@ -182,22 +182,22 @@ def admin_profile():
 def update_profile():
     if "admin_user_id" not in session:  # Changed from "user_id"
         return jsonify({"success": False, "message": "Not authenticated"}), 401
-    
+
     user_id = session["admin_user_id"]  # Changed from "user_id"
     data = request.get_json()
-    
+
     # Get current user
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
+
     # Check if email is being changed and if it's already taken
     new_email = data.get("email")
     if new_email and new_email != user["email"]:
         existing_user = users_collection.find_one({"email": new_email})
         if existing_user:
             return jsonify({"success": False, "message": "Email already in use"}), 400
-    
+
     # Build update data
     update_data = {}
     if data.get("firstname"):
@@ -206,17 +206,17 @@ def update_profile():
         update_data["lastname"] = data["lastname"]
     if new_email:
         update_data["email"] = new_email
-    
+
     # Update user
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": update_data}
     )
-    
+
     # Update session with new name if changed
     if "firstname" in update_data or "lastname" in update_data:
         session["admin_user_name"] = f"{update_data.get('firstname', user['firstname'])} {update_data.get('lastname', user['lastname'])}".strip()
-    
+
     return jsonify({"success": True, "message": "Profile updated successfully"})
 
 
@@ -224,40 +224,40 @@ def update_profile():
 def change_password():
     if "admin_user_id" not in session:  # Changed from "user_id"
         return jsonify({"success": False, "message": "Not authenticated"}), 401
-    
+
     user_id = session["admin_user_id"]  # Changed from "user_id"
     data = request.get_json()
-    
+
     current_password = data.get("current_password")
     new_password = data.get("new_password")
     confirm_password = data.get("confirm_password")
-    
+
     # Validate inputs
     if not current_password or not new_password or not confirm_password:
         return jsonify({"success": False, "message": "All fields are required"}), 400
-    
+
     if new_password != confirm_password:
         return jsonify({"success": False, "message": "New passwords do not match"}), 400
-    
+
     if len(new_password) < 6:
         return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
-    
+
     # Get user
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
+
     # Verify current password
     if not check_password_hash(user["password"], current_password):
         return jsonify({"success": False, "message": "Current password is incorrect"}), 400
-    
+
     # Hash new password and update
     hashed_password = generate_password_hash(new_password)
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {"password": hashed_password}}
     )
-    
+
     return jsonify({"success": True, "message": "Password changed successfully"})
 
 
@@ -412,11 +412,11 @@ def api_update_request(request_id):
         update_data["completed_date"] = datetime.now()
 
     document_requests_collection.update_one(
-        {"_id": ObjectId(request_id)}, 
+        {"_id": ObjectId(request_id)},
         {"$set": update_data}
     )
     return jsonify({"success": True})
-    
+
 @app.route("/api/list-requests")
 def api_list_requests():
     requests = list(document_requests_collection.find().sort("request_date", -1))
@@ -463,6 +463,11 @@ def api_list_requests():
             "remarks": req.get("remarks", ""),
             "feedback_rating": fb.get("rating") if fb else None,
             "feedback_comments": fb.get("comments", "") if fb else "",
+            # When the feedback was submitted (shown in the feedback details modal)
+            "feedback_date": (
+                fb["date_submitted"].strftime("%B %d, %Y %I:%M %p")
+                if fb and fb.get("date_submitted") else ""
+            ),
             "request_date_formatted": request_date_formatted,
             "request_date_iso": request_date_iso
         })
@@ -481,11 +486,16 @@ def api_list_feedbacks():
         date = fb.get("date_submitted")
         formatted_date = date.strftime("%B %d, %Y %I:%M %p") if date else "N/A"
 
+        # Same readable ID the admin Document Requests page shows (e.g. REQ-A3F9C1).
+        # Empty string when the feedback isn't tied to a request (e.g. visitor feedback).
+        linked_request = fb.get("request_id")
+
         result.append({
             "_id": str(fb["_id"]),
+            "request_id": format_request_id(linked_request) if linked_request else "",
             "user_name": fb.get("user_name", "N/A"),
             "rating": fb.get("rating", 0),
-            "comments": fb.get("comments", ""),
+            "comments": fb.get("comments") or "",   # never null, so the page can't break on it
             "status": fb.get("status", "New"),
             "date_submitted": formatted_date
         })
@@ -507,17 +517,53 @@ def _name_pattern(parts):
     return r"^\s*" + r"\s+".join(re.escape(p) for p in parts) + r"\s*$"
 
 
-def is_in_master_list(first_name, last_name):
-    """True if first + last name matches a row in the imported master list
-    (case-insensitive, ignoring extra spaces)."""
-    full_name = f"{first_name} {last_name}"
-    parts = full_name.split()
-    if not parts:
+# Birthday formats that may appear in imported master list files.
+BIRTHDAY_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d",
+                    "%B %d, %Y", "%b %d, %Y")
+
+
+def _normalize_birthday(value):
+    """Turn a birthday string in any common format into YYYY-MM-DD.
+    Returns None if it can't be read as a real date."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    # Handle values like "2008-03-15 00:00:00" or "2008-03-15T00:00:00"
+    candidates = {value, re.split(r"[T ]", value)[0]}
+    for candidate in candidates:
+        for fmt in BIRTHDAY_FORMATS:
+            try:
+                return datetime.strptime(candidate, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+    return None
+
+
+def matches_master_list(first_name, last_name, email, birthday):
+    """True only if first name, last name, email AND birthday all match
+    the same row in the imported master list.
+
+    Names are compared case-insensitively, ignoring extra spaces.
+    `birthday` must already be YYYY-MM-DD."""
+    email_norm = _normalize(email)
+    name_norm = _normalize(f"{first_name} {last_name}")
+    if not email_norm or not name_norm or not birthday:
         return False
 
-    return master_students_collection.find_one(
-        {"full_name": {"$regex": _name_pattern(parts), "$options": "i"}}
-    ) is not None
+    # Imports can contain duplicate rows, so check every row with this email.
+    candidates = master_students_collection.find({
+        "email": {"$regex": f"^{re.escape(email_norm)}$", "$options": "i"}
+    })
+
+    for row in candidates:
+        row_name = row.get("full_name") or f"{row.get('firstname','')} {row.get('lastname','')}"
+        if (
+            _normalize(row_name) == name_norm
+            and _normalize_birthday(row.get("birthday")) == birthday
+        ):
+            return True
+
+    return False
 
 
 def is_already_registered(first_name, last_name, email):
@@ -701,15 +747,15 @@ def delete_feedback(feedback_id):
 @app.route("/api/reports/documents")
 def api_reports_documents():
     from datetime import datetime, timedelta
-    
+
     # Get filter parameters
     period = request.args.get('period', 'all')
     start_date = request.args.get('start')
     end_date = request.args.get('end')
-    
+
     # Build match stage based on filters
     match_stage = {}
-    
+
     if start_date and end_date:
         # Custom date range
         match_stage["request_date"] = {
@@ -732,20 +778,20 @@ def api_reports_documents():
         elif period == 'year':
             start = datetime(now.year, 1, 1)
             match_stage["request_date"] = {"$gte": start}
-    
+
     # Build pipeline
     pipeline = []
     if match_stage:
         pipeline.append({"$match": match_stage})
-    
+
     pipeline.append({"$group": {"_id": "$document_type", "count": {"$sum": 1}}})
     pipeline.append({"$sort": {"count": -1}})  # Sort by count descending
-    
+
     result = list(document_requests_collection.aggregate(pipeline))
-    
+
     # Format for chart.js
     data = {
-        "labels": [r["_id"] for r in result], 
+        "labels": [r["_id"] for r in result],
         "counts": [r["count"] for r in result]
     }
     return jsonify(data)
@@ -755,16 +801,16 @@ def api_reports_documents():
 @app.route("/api/reports/feedbacks")
 def report_feedbacks():
     from datetime import datetime, timedelta
-    
+
     # Get filter parameters
     period = request.args.get('period', 'all')
     rating_filter = request.args.get('rating', 'all')
     start_date = request.args.get('start')
     end_date = request.args.get('end')
-    
+
     # Build match stage based on filters
     match_stage = {}
-    
+
     # Date filtering (using date_submitted field)
     if start_date and end_date:
         # Custom date range - include the entire end date
@@ -788,28 +834,28 @@ def report_feedbacks():
         elif period == 'year':
             start = datetime(now.year, 1, 1)
             match_stage["date_submitted"] = {"$gte": start}
-    
+
     # Rating filtering
     if rating_filter != 'all':
         match_stage["rating"] = int(rating_filter)
-    
+
     # Build pipeline
     pipeline = []
     if match_stage:
         pipeline.append({"$match": match_stage})
-    
+
     pipeline.extend([
         {"$group": {"_id": "$rating", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}}
     ])
-    
+
     data = list(feedback_collection.aggregate(pipeline))
-    
+
     # Always keep 1–5 slots even if empty
     labels = ["1", "2", "3", "4", "5"]
     counts_map = {str(d["_id"]): d["count"] for d in data}
     counts = [counts_map.get(str(i), 0) for i in range(1, 6)]
-    
+
     return jsonify({
         "labels": labels,
         "counts": counts
@@ -945,15 +991,18 @@ def client_register():
             flash("Password must be at least 8 characters.", "danger")
             return redirect(url_for("client_register"))
 
+        # ALL details (first name, last name, email, birthday) must match the
+        # same row in the master list. One generic message, so nobody can guess
+        # which field was wrong and probe the roster.
+        if not matches_master_list(first_name, last_name, email, birthday):
+            flash("We couldn't verify your details against the school's master list. "
+                  "Please make sure your name, email, and birthday are exactly as "
+                  "recorded by the school, or contact the school administrator.", "danger")
+            return redirect(url_for("client_register"))
+
         # block duplicate accounts (same email OR same student name)
         if is_already_registered(first_name, last_name, email):
             flash("Account Already Registered", "danger")
-            return redirect(url_for("client_register"))
-
-        # block registration if the student is not in the master list
-        if not is_in_master_list(first_name, last_name):
-            flash("Your name was not found in the school's master list. "
-                  "Please contact the school administrator.", "danger")
             return redirect(url_for("client_register"))
 
         hashed = generate_password_hash(password)
@@ -996,14 +1045,14 @@ def client_account_settings():
     if "client_user_id" not in session:
         flash("Please login to access account settings", "warning")
         return redirect(url_for("client_login"))
-    
+
     user_id = session["client_user_id"]
     user = users_collection.find_one({"_id": ObjectId(user_id)})
-    
+
     if not user:
         flash("User not found", "danger")
         return redirect(url_for("client_login"))
-    
+
     return render_template("client-account-settings.html", user=user)
 
 
@@ -1011,22 +1060,22 @@ def client_account_settings():
 def update_client_profile():
     if "client_user_id" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
-    
+
     user_id = session["client_user_id"]
     data = request.get_json()
-    
+
     # Get current user
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
+
     # Check if email is being changed and if it's already taken
     new_email = data.get("email")
     if new_email and new_email != user["email"]:
         existing_user = users_collection.find_one({"email": new_email})
         if existing_user:
             return jsonify({"success": False, "message": "Email already in use"}), 400
-    
+
     # Build update data
     update_data = {}
     if data.get("firstname"):
@@ -1041,17 +1090,17 @@ def update_client_profile():
         update_data["section"] = data["section"]
     if data.get("school_year"):
         update_data["school_year"] = data["school_year"]
-    
+
     # Update user
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": update_data}
     )
-    
+
     # Update session with new name if changed
     if "firstname" in update_data or "lastname" in update_data:
         session["client_user_name"] = f"{update_data.get('firstname', user['firstname'])} {update_data.get('lastname', user['lastname'])}".strip()
-    
+
     return jsonify({"success": True, "message": "Profile updated successfully"})
 
 
@@ -1059,40 +1108,40 @@ def update_client_profile():
 def change_client_password():
     if "client_user_id" not in session:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
-    
+
     user_id = session["client_user_id"]
     data = request.get_json()
-    
+
     current_password = data.get("current_password")
     new_password = data.get("new_password")
     confirm_password = data.get("confirm_password")
-    
+
     # Validate inputs
     if not current_password or not new_password or not confirm_password:
         return jsonify({"success": False, "message": "All fields are required"}), 400
-    
+
     if new_password != confirm_password:
         return jsonify({"success": False, "message": "New passwords do not match"}), 400
-    
+
     if len(new_password) < 6:
         return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
-    
+
     # Get user
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
-    
+
     # Verify current password
     if not check_password_hash(user["password"], current_password):
         return jsonify({"success": False, "message": "Current password is incorrect"}), 400
-    
+
     # Hash new password and update
     hashed_password = generate_password_hash(new_password)
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {"password": hashed_password}}
     )
-    
+
     return jsonify({"success": True, "message": "Password changed successfully"})
 
 
@@ -1239,7 +1288,9 @@ def client_feedback():
             rating = int(request.form.get("rating", 0))
         except ValueError:
             rating = 0
-        comments = request.form.get("comments", "")
+        # Accept the textarea under either name ("comments" or "message", which
+        # the visitor form uses), so the comment is never lost to a name mismatch.
+        comments = (request.form.get("comments") or request.form.get("message") or "").strip()
 
         # A rating of 1-5 is required, otherwise the stars would stay gray
         if rating < 1 or rating > 5:
@@ -1300,9 +1351,9 @@ def visitor_feedback():
             "date_submitted": datetime.now(),
             "status": "New"
         }
-        
+
         feedback_collection.insert_one(new_feedback)
-        
+
         # Redirect to thank you page instead of back to form
         return redirect(url_for("visitor_feedback_thank_you"))
 
