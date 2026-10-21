@@ -283,6 +283,116 @@
             white-space: nowrap;
         }
 
+        /* View Details button (shown once feedback is submitted) */
+        .btn-view-feedback {
+            background: white;
+            color: var(--dark-green);
+            border: 2px solid var(--primary-green);
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 20px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-view-feedback:hover {
+            background: var(--primary-green);
+            color: white;
+        }
+
+        /* Feedback details modal (custom, because Bootstrap JS isn't loaded on this page) */
+        .fb-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1050;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .fb-modal-overlay.open {
+            display: flex;
+        }
+
+        .fb-modal {
+            background: white;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        .fb-modal-header {
+            background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+            color: white;
+            padding: 1.1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fb-modal-header h5 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .fb-modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .fb-modal-body {
+            padding: 1.5rem;
+        }
+
+        .fb-row {
+            margin-bottom: 1.1rem;
+        }
+
+        .fb-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .fb-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6c757d;
+            margin-bottom: 0.3rem;
+        }
+
+        .fb-value {
+            color: #2c3e50;
+            font-size: 0.95rem;
+        }
+
+        .fb-stars i {
+            color: #dee2e6;
+            font-size: 1.2rem;
+        }
+
+        .fb-stars i.filled {
+            color: #f6c23e;
+        }
+
+        .fb-comments {
+            background: #f8f9fc;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         .filter-section {
             padding: 1.25rem;
             background: #f8f9fc;
@@ -507,8 +617,20 @@
                                         <span class="feedback-done">
                                             <i class="fas fa-check-circle me-1"></i>Submitted
                                         </span>
+                                        <button type="button" class="btn-view-feedback ml-2"
+                                                data-request-id="{{ r.request_id }}"
+                                                data-document="{{ r.document_type }}"
+                                                data-rating="{{ r.feedback.rating }}"
+                                                data-comments="{{ r.feedback.comments }}"
+                                                data-date="{{ r.feedback.date }}"
+                                                onclick="openFeedbackModal(this)">
+                                            <i class="fas fa-eye me-1"></i>View Details
+                                        </button>
                                     {% else %}
-   <a href="{{ url_for('client_feedback', request=r._id) }}">Give Feedback</a>                                    {% endif %}
+                                        <a class="btn-feedback" href="{{ url_for('client_feedback', request=r._id) }}">
+                                            <i class="fas fa-star"></i> Give Feedback
+                                        </a>
+                                    {% endif %}
                                 {% else %}
                                     <span class="text-muted">&mdash;</span>
                                 {% endif %}
@@ -526,6 +648,34 @@
 
 </div>
 
+<!-- Feedback Details Modal -->
+<div class="fb-modal-overlay" id="fbModal" onclick="if (event.target === this) closeFeedbackModal()">
+    <div class="fb-modal">
+        <div class="fb-modal-header">
+            <h5><i class="fas fa-comment-dots me-2"></i>Feedback Details</h5>
+            <button type="button" class="fb-modal-close" onclick="closeFeedbackModal()">&times;</button>
+        </div>
+        <div class="fb-modal-body">
+            <div class="fb-row">
+                <div class="fb-label">Request</div>
+                <div class="fb-value"><span id="fbRequestId"></span> &middot; <span id="fbDocument"></span></div>
+            </div>
+            <div class="fb-row">
+                <div class="fb-label">Rating</div>
+                <div class="fb-stars" id="fbStars"></div>
+            </div>
+            <div class="fb-row">
+                <div class="fb-label">Comments</div>
+                <div class="fb-value fb-comments" id="fbComments"></div>
+            </div>
+            <div class="fb-row">
+                <div class="fb-label">Date Submitted</div>
+                <div class="fb-value" id="fbDate"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function filterTable() {
     const filter = document.getElementById('statusFilter').value;
@@ -541,6 +691,36 @@ function filterTable() {
         }
     }
 }
+
+function openFeedbackModal(btn) {
+    const rating = parseInt(btn.dataset.rating, 10) || 0;
+
+    document.getElementById('fbRequestId').textContent = btn.dataset.requestId;
+    document.getElementById('fbDocument').textContent = btn.dataset.document;
+    document.getElementById('fbDate').textContent = btn.dataset.date;
+
+    const comments = btn.dataset.comments;
+    const commentsEl = document.getElementById('fbComments');
+    commentsEl.textContent = comments || 'No comment provided.';
+    commentsEl.style.color = comments ? '' : '#6c757d';
+
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        stars += '<i class="fas fa-star' + (i <= rating ? ' filled' : '') + '"></i>';
+    }
+    document.getElementById('fbStars').innerHTML =
+        stars + ' <span class="fb-value ml-2">' + rating + '/5</span>';
+
+    document.getElementById('fbModal').classList.add('open');
+}
+
+function closeFeedbackModal() {
+    document.getElementById('fbModal').classList.remove('open');
+}
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeFeedbackModal();
+});
 </script>
 
 </body>
