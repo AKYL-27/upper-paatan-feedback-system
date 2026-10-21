@@ -1220,18 +1220,26 @@ def client_request_status():
         "user_id": user_id
     }).sort("request_date", -1))   # newest first
 
-    # Requests this user has already left feedback for
-    reviewed_ids = {
-        fb["request_id"]
-        for fb in feedback_collection.find(
-            {"user_id": user_id, "request_id": {"$ne": None}},
-            {"request_id": 1}
-        )
-    }
+    # This user's feedback, keyed by the request it belongs to.
+    # Sorted oldest -> newest so the newest wins if there are several.
+    feedback_by_request = {}
+    for fb in feedback_collection.find(
+        {"user_id": user_id, "request_id": {"$ne": None}}
+    ).sort("date_submitted", 1):
+        feedback_by_request[fb["request_id"]] = fb
 
     # Normalize fields for template
     for r in requests:
-        r["has_feedback"] = r["_id"] in reviewed_ids   # must run BEFORE _id is stringified
+        fb = feedback_by_request.get(r["_id"])   # must run BEFORE _id is stringified
+        r["has_feedback"] = fb is not None
+        # Details shown in the "View Details" popup on the Track Requests page
+        r["feedback"] = {
+            "rating": fb.get("rating", 0),
+            "comments": fb.get("comments") or "",
+            "date": fb["date_submitted"].strftime("%B %d, %Y %I:%M %p")
+                    if fb.get("date_submitted") else "N/A",
+        } if fb else None
+
         r["request_id"] = format_request_id(r["_id"])  # same ID the admin sees
         r["_id"] = str(r["_id"])   # convert ObjectId to string
         r["created_at"] = r.get("request_date")  # match your HTML
