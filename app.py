@@ -1,1469 +1,1383 @@
-"""
-Campus Vehicle Management System - Flask backend
---------------------------------------------------
-Serves the existing static HTML pages (dashboard, user-management,
-motorcycle-management, qrcode-management, entry-exit-records, reports,
-register, login) and exposes a REST API for motorcycles, student/staff
-registration, and security guard registration, backed by MongoDB.
-
-Expected project layout (relative to this file):
-
-    app.py
-    .env                     # your secrets (do NOT commit this)
-    index.html
-    css/
-    images/
-    js/
-    vendors/
-    
-    pages/
-        admin-login.html
-        user-management/users.html
-        motorcycle-management/motorcycle.html
-        entry-exit-records/entry-exit.html
-        reports/reports.html
-    uploads/
-        orcr/                # created automatically at runtime
-        student-dashboard/
-                register.html
-                login.html
-                my-qrcode.html       # <-- lives here, not under pages/
-                styles.css          # and any other assets register/login.html link to
-        security-dashboard/
-                login.html
-                register.html
-                dashboard.html
-                profile.html
-
-Run:
-    pip install flask pymongo werkzeug python-dotenv --break-system-packages
-    # On Windows, also: pip install tzdata --break-system-packages
-    # make sure a MongoDB instance is running, e.g. mongod --dbpath ./data
-    # Create a .env file next to this file with at least:
-    #     MONGO_URI=...
-    #     ADMIN_PASSWORD=your-strong-password   (first run only, creates the first admin)
-    # Optional: FLASK_DEBUG=1 for local development (auto-reload + debugger).
-    python app.py
-"""
-
-
-import json
-import os
-import uuid
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
-from bson.errors import InvalidId
-from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, request, send_from_directory
-from pymongo import MongoClient, ReturnDocument
-from pymongo.errors import PyMongoError
-from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.utils import secure_filename
+from dotenv import load_dotenv, find_dotenv
+from datetime import datetime, timedelta
+import re
+import os
+from collections import Counter
 
-# Load variables from a .env file (if present) into os.environ. This must run
-# before any os.environ.get(...) call below.
-load_dotenv()
+# -----------------------------
+# TIME HELPERS
+# -----------------------------
+def to_ampm(time_str):
+    try:
+        dt = datetime.strptime(time_str, "%H:%M")
+    except ValueError:
+        try:
+            dt = datetime.strptime(time_str.strip(), "%I:%M %p")
+        except ValueError:
+            return time_str
+    return dt.strftime("%I:%M %p").lstrip("0")
 
-# ── Configuration ────────────────────────────────────────────────────────────
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "orcr")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+def to_24h(time_str):
+    try:
+        dt = datetime.strptime(time_str.strip(), "%I:%M %p")
+        return dt.strftime("%H:%M")
+    except ValueError:
+        return time_str
 
-# Never hardcode real credentials here. Set MONGO_URI in your .env file.
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
-DB_NAME = os.environ.get("MONGO_DB", "motorcycle_system")
+# -----------------------------
+# REQUEST ID HELPER (shared by admin + client pages so IDs always match)
+# -----------------------------
+def format_request_id(oid):
+    """Readable request ID, e.g. REQ-A3F9C1 (last 6 chars of the MongoDB _id)."""
+    return "REQ-" + str(oid)[-6:].upper()
 
-# Timezone used for "today" on the security dashboard. Set APP_TIMEZONE to change it.
-LOCAL_TZ = ZoneInfo(os.environ.get("APP_TIMEZONE", "Asia/Manila"))
+# Load .env
+load_dotenv(find_dotenv())
 
-REQUIRED_FIELDS = ["owner", "plate", "brand", "model"]
-# Registered / Pending / Flagged are the vehicle's gate-eligibility state.
-# Approved / Declined are set from the motorcycle-management page's
-# per-row Approve/Decline buttons (a moderation decision on the vehicle
-# itself), distinct from a user/guard *account's* approval_status.
-ALLOWED_STATUSES = {"Registered", "Pending", "Flagged", "Approved", "Declined"}
+# Flask Setup
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev_secret")
+app.jinja_env.filters['to_ampm'] = to_ampm
 
-# QR pass status is tracked separately from the vehicle's gate-eligibility
-# `status` above — this is purely about whether a QR pass has been issued
-# for the vehicle (see the QR Code Management page).
-ALLOWED_QR_STATUSES = {"Active", "None", "Expired"}
-
-# Name is split into firstName / middleName (optional) / lastName. The full
-# name is built server-side from those parts and stored as `fullName` so the
-# rest of the app (motorcycle owner, dashboards, logs) keeps working.
-# gradeLevel and section are required only for students (checked in
-# validate_user_payload), since staff/faculty don't have them.
-USER_REQUIRED_FIELDS = ["firstName", "lastName", "role", "idNumber", "email", "contactNumber", "password"]
-ALLOWED_ROLES = {"student", "staff"}
-
-# Security guard registration is a separate flow/collection from
-# student & staff registration above, since guards don't have a
-# grade level/section or an associated motorcycle.
-SECURITY_REQUIRED_FIELDS = ["fullName", "idNumber", "email", "contactNumber", "password"]
-
-ALLOWED_ORCR_EXTENSIONS = {"png", "jpg", "jpeg", "pdf"}
-MAX_ORCR_SIZE_BYTES = 5 * 1024 * 1024  # 5MB, matches the frontend copy
-
-app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
-app.config["MAX_CONTENT_LENGTH"] = MAX_ORCR_SIZE_BYTES + (1 * 1024 * 1024)  # small buffer for form overhead
+# MongoDB Setup
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = os.getenv("DB_NAME", "feedback_system")
 
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
-motorcycles = db["motorcycles"]
-users = db["users"]
-security_guards = db["security_guards"]
-entry_exit_logs = db["entry_exit_logs"]
-# Every scan that gets refused — an unrecognized QR code, or a gate-entry
-# attempt on a motorcycle that isn't eligible or is already inside — is
-# recorded here so the Reports page can chart denied/unverified attempts
-# over time. This is separate from entry_exit_logs, which only holds
-# successful entries/exits.
-denied_scans = db["denied_scans"]
-# Admin accounts for the admin dashboard (index.html and pages/*). Kept in
-# their own collection, separate from students/staff and security guards.
-admins = db["admins"]
 
-# Enforce unique plate numbers and emails at the database level.
-motorcycles.create_index("plate", unique=True)
-users.create_index("email", unique=True)
-security_guards.create_index("email", unique=True)
-security_guards.create_index("idNumber", unique=True)
-entry_exit_logs.create_index([("owner_id", 1), ("entry_time", -1)])
-denied_scans.create_index("time")
-admins.create_index("username", unique=True)
+# Collections
+users_collection = db["users"]
+document_requests_collection = db["document_requests"]
+feedback_collection = db["feedback"]
+document_types_collection = db["document_types"]
+master_students_collection = db["master_students"]  # imported roster (master list)
+
+# Unique index on email so two simultaneous registrations can't create duplicates.
+# Wrapped in try/except: if duplicate emails already exist in the database,
+# MongoDB refuses to build the index. The app still works; the application-level
+# check in is_already_registered() continues to protect against duplicates.
+try:
+    users_collection.create_index("email", unique=True)
+except Exception as e:
+    print(f"WARNING: could not create unique index on users.email: {e}")
+
+print(f"Connected to database: {DB_NAME}")
 
 
-def seed_default_admin():
-    """Create the first admin account if none exist yet.
+# -----------------------------
+# LANDING PAGE / HOME ROUTE
+# -----------------------------
 
-    Reads ADMIN_USERNAME (default "admin"), ADMIN_PASSWORD (required) and
-    ADMIN_EMAIL (optional) from the environment (or .env), so no password
-    lives in the source code. Does nothing once any admin exists.
-    """
-    if admins.count_documents({}) > 0:
-        return
-    username = os.environ.get("ADMIN_USERNAME", "admin").strip().lower()
-    password = os.environ.get("ADMIN_PASSWORD")
-    if not password:
-        print("[admin] No admin account exists. Set ADMIN_PASSWORD (and "
-              "optionally ADMIN_USERNAME) in your .env file and restart to "
-              "create the first admin.")
-        return
-    admins.insert_one({
-        "username": username,
-        "fullName": "Administrator",
-        "email": os.environ.get("ADMIN_EMAIL", "").strip().lower(),
-        "password_hash": generate_password_hash(password),
-        "created_at": datetime.now(timezone.utc),
-    })
-    print(f"[admin] Created admin account '{username}'.")
-
-
-seed_default_admin()
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-def serialize(doc):
-    """Convert a MongoDB document into a JSON-friendly dict."""
-    doc = dict(doc)
-    doc["id"] = str(doc.pop("_id"))
-    return doc
-
-
-def to_object_id(raw_id):
-    try:
-        return ObjectId(raw_id)
-    except (InvalidId, TypeError):
-        return None
-
-
-def validate_payload(data, partial=False):
-    """Basic validation. Returns an error message, or None if valid."""
-    if not partial:
-        missing = [f for f in REQUIRED_FIELDS if not str(data.get(f, "")).strip()]
-        if missing:
-            return f"Missing required field(s): {', '.join(missing)}"
-
-    if "status" in data and data["status"] not in ALLOWED_STATUSES:
-        return f"Status must be one of: {', '.join(sorted(ALLOWED_STATUSES))}"
-
-    if "qr_status" in data and data["qr_status"] not in ALLOWED_QR_STATUSES:
-        return f"qr_status must be one of: {', '.join(sorted(ALLOWED_QR_STATUSES))}"
-
-    return None
-
-
-def clean_motorcycle_fields(data):
-    """Pick out only the fields we care about and normalize them."""
-    fields = {}
-    for key in ["owner", "brand", "model", "color", "year", "orcr", "status", "qr_status"]:
-        if key in data:
-            fields[key] = str(data[key]).strip()
-    if "plate" in data:
-        fields["plate"] = str(data["plate"]).strip().upper()
-    if "status" not in fields:
-        fields.setdefault("status", "Registered")
-    return fields
-
-
-def _valid_email(email):
-    return "@" in email and "." in email.split("@")[-1]
-
-
-def validate_user_payload(data):
-    missing = [f for f in USER_REQUIRED_FIELDS if not str(data.get(f, "")).strip()]
-    if missing:
-        return f"Missing required field(s): {', '.join(missing)}"
-
-    email = str(data.get("email", "")).strip()
-    if not _valid_email(email):
-        return "Please provide a valid email address."
-
-    if len(str(data.get("password", ""))) < 8:
-        return "Password must be at least 8 characters."
-
-    if data.get("role") not in ALLOWED_ROLES:
-        return "Role must be 'student' or 'staff'."
-
-    # Grade level and section only apply to students.
-    if data.get("role") == "student":
-        if not str(data.get("gradeLevel", "")).strip():
-            return "Grade level is required for students."
-        if not str(data.get("section", "")).strip():
-            return "Section is required for students."
-
-    return None
-
-
-def validate_security_payload(data):
-    missing = [f for f in SECURITY_REQUIRED_FIELDS if not str(data.get(f, "")).strip()]
-    if missing:
-        return f"Missing required field(s): {', '.join(missing)}"
-
-    email = str(data.get("email", "")).strip()
-    if not _valid_email(email):
-        return "Please provide a valid email address."
-
-    if len(str(data.get("password", ""))) < 8:
-        return "Password must be at least 8 characters."
-
-    return None
-
-
-def approval_block_message(doc):
-    """Return an error message if this account may not sign in yet, else None.
-
-    Accounts created before approvals existed have no approval_status and are
-    treated as approved.
-    """
-    status = doc.get("approval_status", "Approved")
-    if status == "Pending":
-        return "Your account is still waiting for approval. Please try again later."
-    if status == "Declined":
-        return "Your registration was declined. Please contact the security office."
-    return None
-
-
-def allowed_orcr_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_ORCR_EXTENSIONS
-
-
-def _to_local(dt):
-    """MongoDB returns naive datetimes that are really UTC. Make them local."""
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(LOCAL_TZ)
-
-
-def serialize_log(doc):
-    """Convert an entry/exit log document into a JSON-friendly, display-ready dict.
-
-    MongoDB stores (and pymongo returns) these timestamps as naive UTC, so
-    everything here is converted to LOCAL_TZ (Asia/Manila by default) before
-    formatting or being handed to the frontend — otherwise both the display
-    strings and the raw ISO timestamps are 8 hours off from PH time.
-    """
-    doc = dict(doc)
-    doc["id"] = str(doc.pop("_id"))
-    entry_time = doc.get("entry_time")
-    exit_time = doc.get("exit_time")
-
-    entry_local = _to_local(entry_time) if entry_time else None
-    exit_local = _to_local(exit_time) if exit_time else None
-
-    # Human-friendly display strings the history table can render directly.
-    doc["date"] = entry_local.strftime("%b %d, %Y") if entry_local else ""
-    doc["time_in"] = entry_local.strftime("%I:%M %p").lstrip("0") if entry_local else "—"
-    doc["time_out"] = exit_local.strftime("%I:%M %p").lstrip("0") if exit_local else "—"
-
-    # Raw ISO timestamps too (now with a local UTC+8 offset), in case the
-    # frontend needs to do its own formatting or date-key comparisons.
-    doc["entry_time"] = entry_local.isoformat() if entry_local else None
-    doc["exit_time"] = exit_local.isoformat() if exit_local else None
-    return doc
-
-
-def build_log_query(args):
-    query = {}
-
-    owner_id = args.get("owner_id", "").strip()
-    if owner_id:
-        query["owner_id"] = owner_id
-
-    q = args.get("q", "").strip()
-    if q:
-        regex = {"$regex": q, "$options": "i"}
-        query["$or"] = [{"plate": regex}, {"status": regex}]
-
-    date_str = args.get("date", "").strip()
-    if date_str:
-        try:
-            # `date_str` is a calendar day in LOCAL_TZ (e.g. what a PH-based
-            # <input type="date"> sends), but entry_time is stored as naive
-            # UTC — so build the local day's bounds, then convert to naive
-            # UTC to match what's actually in the database.
-            local_day_start = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=LOCAL_TZ)
-            local_day_end = local_day_start + timedelta(days=1)
-            day_start = local_day_start.astimezone(timezone.utc).replace(tzinfo=None)
-            day_end = local_day_end.astimezone(timezone.utc).replace(tzinfo=None)
-            query["entry_time"] = {"$gte": day_start, "$lt": day_end}
-        except ValueError:
-            pass  # ignore unparseable date filters rather than erroring
-
-    range_str = args.get("range", "").strip().lower()
-    if range_str in ("week", "month") and "entry_time" not in query:
-        now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(days=7 if range_str == "week" else 30)
-        query["entry_time"] = {"$gte": cutoff}
-
-    return query
-
-
-# ── Page routes (serve the existing static HTML) ────────────────────────────
 @app.route("/")
-def dashboard():
-    return send_from_directory(BASE_DIR, "index.html")
+def index():
+    """Landing page redirects to admin login"""
+    return redirect(url_for("admin_login"))
+
+# -----------------------------
+# ADMIN LOGIN ROUTES
+# -----------------------------
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    # If already logged in, redirect to dashboard
+    if "admin_user_id" in session:
+        return redirect(url_for("admin_dashboard"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").lower().strip()
+        password = request.form.get("password")
+        remember_me = request.form.get("remember_me")
+
+        # Validate input
+        if not email or not password:
+            flash("Please fill in all fields", "danger")
+            return redirect(url_for("admin_login"))
+
+        # Find user in database
+        user = users_collection.find_one({"email": email})
+
+        if not user:
+            flash("Invalid email or password", "danger")
+            return redirect(url_for("admin_login"))
+
+        # Check if user is admin
+        if user.get("role") != "admin":
+            flash("Access denied. Admin credentials required.", "danger")
+            return redirect(url_for("admin_login"))
+
+        # Verify password
+        if not check_password_hash(user["password"], password):
+            flash("Invalid email or password", "danger")
+            return redirect(url_for("admin_login"))
+
+        # Set session
+        session["admin_user_id"] = str(user["_id"])
+        session["admin_user_name"] = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+        session["admin_email"] = user["email"]
+
+        # Set session permanent if remember me is checked
+        if remember_me:
+            session.permanent = True
+            app.permanent_session_lifetime = timedelta(days=30)
+
+        flash("Login successful! Welcome back.", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    return render_template("login.html")
 
 
-@app.route("/admin/login")
-def admin_login_page():
-    # The login page lives in pages/. /pages/admin-login.html also works
-    # directly; this is just a friendlier URL.
-    return send_from_directory(os.path.join(BASE_DIR, "pages"), "admin-login.html")
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_user_id", None)
+    session.pop("admin_user_name", None)
+    session.pop("admin_email", None)
+    flash("You have been logged out successfully.", "info")
+    return redirect(url_for("admin_login"))
 
 
-@app.route("/dashboard")
-def dashboard_page():
-    # dashboard.html also lives in student-dashboard/, same reasoning as
-    # /register and /login above.
-    return redirect("/pages/student-dashboard/dashboard.html")
+@app.route("/admin/forgot-password", methods=["GET", "POST"])
+def admin_forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").lower().strip()
+
+        user = users_collection.find_one({"email": email, "role": "admin"})
+
+        if user:
+            # Here you would typically send a password reset email
+            # For now, just show a success message
+            flash("Password reset instructions have been sent to your email.", "success")
+        else:
+            # Don't reveal if email exists or not for security
+            flash("If that email exists in our system, you will receive password reset instructions.", "info")
+
+        return redirect(url_for("admin_login"))
+
+    return render_template("admin-forgot-password.html")
+
+# -----------------------------
+# PROFILE ROUTES
+# -----------------------------
+
+@app.route("/admin/profile")
+def admin_profile():
+    if "admin_user_id" not in session:  # Changed from "user_id"
+        return redirect(url_for("admin_login"))
+
+    user_id = session["admin_user_id"]  # Changed from "user_id"
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+
+    if not user:
+        return redirect(url_for("admin_login"))
+
+    return render_template("profile.html", user=user)
 
 
-@app.route("/history")
-def history_page():
-    return redirect("/student-dashboard/history.html")
+@app.route("/api/profile/update", methods=["POST"])
+def update_profile():
+    if "admin_user_id" not in session:  # Changed from "user_id"
+        return jsonify({"success": False, "message": "Not authenticated"}), 401
 
+    user_id = session["admin_user_id"]  # Changed from "user_id"
+    data = request.get_json()
 
-@app.route("/my-motorcycle")
-def my_motorcycle_page():
-    return redirect("/student-dashboard/my-motorcycle.html")
+    # Get current user
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
 
+    # Check if email is being changed and if it's already taken
+    new_email = data.get("email")
+    if new_email and new_email != user["email"]:
+        existing_user = users_collection.find_one({"email": new_email})
+        if existing_user:
+            return jsonify({"success": False, "message": "Email already in use"}), 400
 
-@app.route("/qrcode")
-def qrcode_page():
+    # Build update data
+    update_data = {}
+    if data.get("firstname"):
+        update_data["firstname"] = data["firstname"]
+    if data.get("lastname"):
+        update_data["lastname"] = data["lastname"]
+    if new_email:
+        update_data["email"] = new_email
 
-    return redirect("/pages/student-dashboard/my-qrcode.html")
-
-
-@app.route("/register")
-def register_page():
-
-    return redirect("/student-dashboard/register.html")
-
-
-@app.route("/login")
-def login_page():
-
-    return redirect("/pages/student-dashboard/login.html")
-
-
-@app.route("/security/register")
-def security_register_page():
-    return redirect("/security-dashboard/register.html")
-
-
-@app.route("/security/login")
-def security_login_page():
-    return redirect("/security-dashboard/login.html")
-
-
-@app.route("/pages/<path:subpath>")
-def pages(subpath):
-    return send_from_directory(os.path.join(BASE_DIR, "pages"), subpath)
-
-
-# Static assets (css/js/vendors/images) are already handled automatically by
-# Flask's static_folder="." configuration above.
-
-
-# ── API: Motorcycles ─────────────────────────────────────────────────────────
-@app.route("/api/motorcycles", methods=["GET"])
-def list_motorcycles():
-    q = request.args.get("q", "").strip()
-    owner_id = request.args.get("owner_id", "").strip()
-
-    query = {}
-    if owner_id:
-        query["owner_id"] = owner_id
-    elif q:
-        regex = {"$regex": q, "$options": "i"}
-        query = {"$or": [{"owner": regex}, {"plate": regex}, {"brand": regex}, {"model": regex}]}
-
-    docs = motorcycles.find(query).sort("created_at", -1)
-    return jsonify([serialize(d) for d in docs])
-
-
-@app.route("/api/motorcycles/<moto_id>", methods=["GET"])
-def get_motorcycle(moto_id):
-    oid = to_object_id(moto_id)
-    if oid is None:
-        return jsonify({"error": "Invalid motorcycle id"}), 400
-
-    doc = motorcycles.find_one({"_id": oid})
-    if doc is None:
-        return jsonify({"error": "Motorcycle not found"}), 404
-    return jsonify(serialize(doc))
-
-
-@app.route("/api/motorcycles", methods=["POST"])
-def create_motorcycle():
-    data = request.get_json(silent=True) or {}
-    error = validate_payload(data)
-    if error:
-        return jsonify({"error": error}), 400
-
-    fields = clean_motorcycle_fields(data)
-    fields["created_at"] = datetime.now(timezone.utc)
-    fields["updated_at"] = fields["created_at"]
-
-    try:
-        result = motorcycles.insert_one(fields)
-    except PyMongoError as exc:
-        if "duplicate key" in str(exc).lower():
-            return jsonify({"error": "Plate number already registered."}), 409
-        return jsonify({"error": "Database error while saving motorcycle."}), 500
-
-    doc = motorcycles.find_one({"_id": result.inserted_id})
-    return jsonify(serialize(doc)), 201
-
-
-@app.route("/api/motorcycles/<moto_id>", methods=["PUT", "PATCH"])
-def update_motorcycle(moto_id):
-    oid = to_object_id(moto_id)
-    if oid is None:
-        return jsonify({"error": "Invalid motorcycle id"}), 400
-
-    data = request.get_json(silent=True) or {}
-    error = validate_payload(data, partial=(request.method == "PATCH"))
-    if error:
-        return jsonify({"error": error}), 400
-
-    fields = clean_motorcycle_fields(data)
-    fields["updated_at"] = datetime.now(timezone.utc)
-
-    try:
-        doc = motorcycles.find_one_and_update(
-            {"_id": oid},
-            {"$set": fields},
-            return_document=ReturnDocument.AFTER,
-        )
-    except PyMongoError as exc:
-        if "duplicate key" in str(exc).lower():
-            return jsonify({"error": "Plate number already registered."}), 409
-        return jsonify({"error": "Database error while updating motorcycle."}), 500
-
-    if doc is None:
-        return jsonify({"error": "Motorcycle not found"}), 404
-    return jsonify(serialize(doc))
-
-
-@app.route("/api/motorcycles/<moto_id>", methods=["DELETE"])
-def delete_motorcycle(moto_id):
-    oid = to_object_id(moto_id)
-    if oid is None:
-        return jsonify({"error": "Invalid motorcycle id"}), 400
-
-    result = motorcycles.delete_one({"_id": oid})
-    if result.deleted_count == 0:
-        return jsonify({"error": "Motorcycle not found"}), 404
-    return jsonify({"deleted": True})
-
-
-@app.route("/api/motorcycles/<moto_id>/orcr", methods=["POST"])
-def upload_orcr(moto_id):
-    """Upload / replace the OR/CR document for a motorcycle.
-
-    Expects a multipart/form-data request with a single file field named
-    'file'. Stores the file under uploads/orcr/<uuid>.<ext> and records the
-    public path on the motorcycle document's 'orcr' field.
-    """
-    oid = to_object_id(moto_id)
-    if oid is None:
-        return jsonify({"error": "Invalid motorcycle id"}), 400
-
-    moto = motorcycles.find_one({"_id": oid})
-    if moto is None:
-        return jsonify({"error": "Motorcycle not found"}), 404
-
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided."}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No file selected."}), 400
-
-    if not allowed_orcr_file(file.filename):
-        return jsonify({"error": "File must be PNG, JPG, or PDF."}), 400
-
-    ext = secure_filename(file.filename).rsplit(".", 1)[1].lower()
-    stored_name = f"{uuid.uuid4().hex}.{ext}"
-    stored_path = os.path.join(UPLOAD_DIR, stored_name)
-    file.save(stored_path)
-
-    public_path = f"/uploads/orcr/{stored_name}"
-
-    doc = motorcycles.find_one_and_update(
-        {"_id": oid},
-        {"$set": {"orcr": public_path, "updated_at": datetime.now(timezone.utc)}},
-        return_document=ReturnDocument.AFTER,
+    # Update user
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": update_data}
     )
-    return jsonify(serialize(doc)), 200
+
+    # Update session with new name if changed
+    if "firstname" in update_data or "lastname" in update_data:
+        session["admin_user_name"] = f"{update_data.get('firstname', user['firstname'])} {update_data.get('lastname', user['lastname'])}".strip()
+
+    return jsonify({"success": True, "message": "Profile updated successfully"})
 
 
-@app.route("/uploads/orcr/<path:filename>")
-def serve_orcr(filename):
-    return send_from_directory(UPLOAD_DIR, filename)
+@app.route("/api/profile/change-password", methods=["POST"])
+def change_password():
+    if "admin_user_id" not in session:  # Changed from "user_id"
+        return jsonify({"success": False, "message": "Not authenticated"}), 401
 
+    user_id = session["admin_user_id"]  # Changed from "user_id"
+    data = request.get_json()
 
-# ── API: Registration (students / staff) ─────────────────────────────────────
-@app.route("/api/register", methods=["POST"])
-def register_user():
-    data = request.get_json(silent=True) or {}
-    error = validate_user_payload(data)
-    if error:
-        return jsonify({"error": error}), 400
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+    confirm_password = data.get("confirm_password")
 
-    email = str(data["email"]).strip().lower()
+    # Validate inputs
+    if not current_password or not new_password or not confirm_password:
+        return jsonify({"success": False, "message": "All fields are required"}), 400
 
-    first_name = str(data["firstName"]).strip()
-    middle_name = str(data.get("middleName", "")).strip()
-    last_name = str(data["lastName"]).strip()
-    # Build the display name from the parts so it can't drift out of sync.
-    full_name = " ".join(p for p in (first_name, middle_name, last_name) if p)
-    is_student = data["role"] == "student"
+    if new_password != confirm_password:
+        return jsonify({"success": False, "message": "New passwords do not match"}), 400
 
-    user_doc = {
-        "firstName": first_name,
-        "middleName": middle_name,
-        "lastName": last_name,
-        "fullName": full_name,
-        "role": data["role"],
-        "idNumber": str(data["idNumber"]).strip(),
-        "gradeLevel": str(data.get("gradeLevel", "")).strip() if is_student else "",
-        "section": str(data.get("section", "")).strip() if is_student else "",
-        "approval_status": "Pending",
-        "email": email,
-        "contactNumber": str(data["contactNumber"]).strip(),
-        "password_hash": generate_password_hash(str(data["password"])),
-        "created_at": datetime.now(timezone.utc),
-    }
+    if len(new_password) < 6:
+        return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
 
-    try:
-        result = users.insert_one(user_doc)
-    except PyMongoError as exc:
-        if "duplicate key" in str(exc).lower():
-            return jsonify({"error": "An account with this email already exists."}), 409
-        return jsonify({"error": "Database error while creating account."}), 500
+    # Get user
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
 
-    moto_result = None
-    moto_data = data.get("motorcycle")
-    if moto_data:
-        # The frontend doesn't collect a separate "owner" field for the
-        # motorcycle — it's implied by the account being registered. Fill it
-        # in before validating, since validate_payload requires it.
-        moto_data = dict(moto_data)
-        moto_data.setdefault("owner", user_doc["fullName"])
+    # Verify current password
+    if not check_password_hash(user["password"], current_password):
+        return jsonify({"success": False, "message": "Current password is incorrect"}), 400
 
-        moto_error = validate_payload(moto_data)
-        if moto_error:
-            # Roll back the user if the motorcycle payload is invalid, so we
-            # don't end up with an orphaned account.
-            users.delete_one({"_id": result.inserted_id})
-            return jsonify({"error": moto_error}), 400
-
-        moto_fields = clean_motorcycle_fields(moto_data)
-        moto_fields["owner"] = user_doc["fullName"]
-        moto_fields["owner_id"] = str(result.inserted_id)
-        moto_fields["status"] = "Pending"
-        moto_fields["created_at"] = datetime.now(timezone.utc)
-        moto_fields["updated_at"] = moto_fields["created_at"]
-
-        try:
-            moto_insert = motorcycles.insert_one(moto_fields)
-            moto_result = serialize(motorcycles.find_one({"_id": moto_insert.inserted_id}))
-        except PyMongoError as exc:
-            users.delete_one({"_id": result.inserted_id})
-            if "duplicate key" in str(exc).lower():
-                return jsonify({"error": "Plate number already registered."}), 409
-            return jsonify({"error": "Database error while saving motorcycle."}), 500
-
-    user_response = serialize(users.find_one({"_id": result.inserted_id}))
-    user_response.pop("password_hash", None)
-
-    return jsonify({"user": user_response, "motorcycle": moto_result}), 201
-
-
-@app.route("/api/login", methods=["POST"])
-def login_user():
-    data = request.get_json(silent=True) or {}
-    identifier = str(data.get("identifier", "")).strip()
-    password = str(data.get("password", ""))
-
-    if not identifier or not password:
-        return jsonify({"error": "ID/email and password are required."}), 400
-
-    # The login form accepts either a student/employee ID or an email
-    # address in the same field, so match against both.
-    user = users.find_one({
-        "$or": [
-            {"email": identifier.lower()},
-            {"idNumber": identifier},
-        ]
-    })
-    # Use the same generic message whether the identifier doesn't exist or
-    # the password is wrong, so we don't leak which accounts are registered.
-    if user is None or not check_password_hash(user["password_hash"], password):
-        return jsonify({"error": "Incorrect ID/email or password. Please try again."}), 401
-    blocked = approval_block_message(user)
-    if blocked:
-        return jsonify({"error": blocked}), 403
-
-    user_response = serialize(user)
-    user_response.pop("password_hash", None)
-
-    return jsonify({"user": user_response}), 200
-
-
-@app.route("/api/users/<user_id>", methods=["GET"])
-def get_user(user_id):
-    oid = to_object_id(user_id)
-    if oid is None:
-        return jsonify({"error": "Invalid user id"}), 400
-
-    user = users.find_one({"_id": oid})
-    if user is None:
-        return jsonify({"error": "User not found"}), 404
-
-    user_response = serialize(user)
-    user_response.pop("password_hash", None)
-    return jsonify(user_response)
-
-
-# ── API: Registration (security guards) ──────────────────────────────────────
-@app.route("/api/security/register", methods=["POST"])
-def register_security_guard():
-    """Register a new security guard account.
-
-    Kept separate from /api/register (students/staff) because guards don't
-    have a grade level/section or a motorcycle to attach, and they live in
-    their own collection so gate-side auth stays independent of the student
-    system.
-    """
-    data = request.get_json(silent=True) or {}
-    error = validate_security_payload(data)
-    if error:
-        return jsonify({"error": error}), 400
-
-    email = str(data["email"]).strip().lower()
-    id_number = str(data["idNumber"]).strip()
-
-    guard_doc = {
-        "fullName": str(data["fullName"]).strip(),
-        "role": "security",
-        "idNumber": id_number,
-        "email": email,
-        "contactNumber": str(data["contactNumber"]).strip(),
-        "assignedPost": str(data.get("assignedPost", "")).strip(),
-        "approval_status": "Pending",
-        "password_hash": generate_password_hash(str(data["password"])),
-        "created_at": datetime.now(timezone.utc),
-    }
-
-    try:
-        result = security_guards.insert_one(guard_doc)
-    except PyMongoError as exc:
-        message = str(exc).lower()
-        if "duplicate key" in message and "idnumber" in message:
-            return jsonify({"error": "An account with this badge/employee ID already exists."}), 409
-        if "duplicate key" in message:
-            return jsonify({"error": "An account with this email already exists."}), 409
-        return jsonify({"error": "Database error while creating account."}), 500
-
-    guard_response = serialize(security_guards.find_one({"_id": result.inserted_id}))
-    guard_response.pop("password_hash", None)
-
-    return jsonify({"guard": guard_response}), 201
-
-
-@app.route("/api/security/login", methods=["POST"])
-def login_security_guard():
-    data = request.get_json(silent=True) or {}
-    identifier = str(data.get("identifier", "")).strip()
-    password = str(data.get("password", ""))
-
-    if not identifier or not password:
-        return jsonify({"error": "ID/email and password are required."}), 400
-
-    guard = security_guards.find_one({
-        "$or": [
-            {"email": identifier.lower()},
-            {"idNumber": identifier},
-        ]
-    })
-    if guard is None or not check_password_hash(guard["password_hash"], password):
-        return jsonify({"error": "Incorrect ID/email or password. Please try again."}), 401
-    blocked = approval_block_message(guard)
-    if blocked:
-        return jsonify({"error": blocked}), 403
-
-    guard_response = serialize(guard)
-    guard_response.pop("password_hash", None)
-
-    return jsonify({"guard": guard_response}), 200
-
-
-@app.route("/api/security/dashboard", methods=["GET"])
-def security_dashboard():
-    """Numbers and recent activity for the security dashboard.
-
-    "Today" is based on LOCAL_TZ (default Asia/Manila), not UTC, so the
-    counts reset at local midnight.
-
-    NOTE: this route must stay above /api/security/<guard_id> below, or
-    "dashboard" would be treated as a guard id.
-    """
-    try:
-        limit = max(1, min(20, int(request.args.get("limit", 5))))
-    except ValueError:
-        limit = 5
-
-    now_local = datetime.now(LOCAL_TZ)
-    day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
-    yesterday_start = day_start - timedelta(days=1)
-
-    entered_today = entry_exit_logs.count_documents(
-        {"entry_time": {"$gte": day_start, "$lt": day_end}}
+    # Hash new password and update
+    hashed_password = generate_password_hash(new_password)
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password": hashed_password}}
     )
-    exited_today = entry_exit_logs.count_documents(
-        {"exit_time": {"$gte": day_start, "$lt": day_end}}
-    )
-    entered_yesterday = entry_exit_logs.count_documents(
-        {"entry_time": {"$gte": yesterday_start, "$lt": day_start}}
-    )
-    inside_now = entry_exit_logs.count_documents({"exit_time": None})
 
-    # Each log can produce two events (an entry and, later, an exit).
-    events = []
-    for d in entry_exit_logs.find().sort("entry_time", -1).limit(limit):
-        events.append((d["entry_time"], "entry", d))
-    for d in (
-        entry_exit_logs.find({"exit_time": {"$ne": None}})
-        .sort("exit_time", -1)
-        .limit(limit)
-    ):
-        events.append((d["exit_time"], "exit", d))
-    events.sort(key=lambda e: _to_local(e[0]), reverse=True)
-    events = events[:limit]
+    return jsonify({"success": True, "message": "Password changed successfully"})
 
-    # Look up owner names in one query.
-    oids = [to_object_id(d.get("owner_id")) for _, _, d in events]
-    oids = [o for o in oids if o is not None]
-    names = {
-        str(u["_id"]): u.get("fullName", "Unknown")
-        for u in users.find({"_id": {"$in": oids}}, {"fullName": 1})
-    }
 
-    recent = [
-        {
-            "owner": names.get(d.get("owner_id"), "Unknown"),
-            "plate": d.get("plate", ""),
-            "time": _to_local(t).strftime("%I:%M %p").lstrip("0"),
-            "type": kind,
-        }
-        for t, kind, d in events
+# -----------------------------
+# ADMIN SESSION PROTECTION
+# -----------------------------
+
+# Add this decorator to protect admin routes
+from functools import wraps
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "admin_user_id" not in session:
+            flash("Please login to access this page", "warning")
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route("/admin/dashboard")
+def admin_dashboard():
+    total_requests = document_requests_collection.count_documents({})
+    pending = document_requests_collection.count_documents({"status": "Pending"})
+    completed = document_requests_collection.count_documents({"status": "Completed"})
+    avg_rating_pipeline = [
+        {"$group": {"_id": None, "avg": {"$avg": "$rating"}}}
     ]
+    avg_rating = list(feedback_collection.aggregate(avg_rating_pipeline))
+    avg_rating_val = round(avg_rating[0]["avg"], 1) if avg_rating else 0
+    return render_template("index.html",
+                           total_requests=total_requests,
+                           pending=pending,
+                           completed=completed,
+                           avg_rating=avg_rating_val)
 
-    return jsonify({
-        "entered_today": entered_today,
-        "exited_today": exited_today,
-        "inside_now": inside_now,
-        "entered_delta": entered_today - entered_yesterday,
-        "as_of": now_local.strftime("%I:%M %p").lstrip("0"),
-        "recent": recent,
-    })
+@app.route("/admin/document-requests")
+def document_requests():
+    # Fetch all document requests, sorted by newest first
+    requests = list(document_requests_collection.find().sort("request_date", -1))
 
+    for req in requests:
+        # User info
+        if req.get("user_id"):
+            user = users_collection.find_one({"_id": req["user_id"]})
+            if user:
+                req["user_name"] = f"{user.get('firstname', '')} {user.get('lastname', '')}".strip()
+                req["user_email"] = user.get("email", "N/A")
+            else:
+                req["user_name"] = "N/A"
+                req["user_email"] = "N/A"
+        else:
+            req["user_name"] = "N/A"
+            req["user_email"] = "N/A"
 
-@app.route("/api/security/<guard_id>", methods=["GET"])
-def get_security_guard(guard_id):
-    oid = to_object_id(guard_id)
-    if oid is None:
-        return jsonify({"error": "Invalid guard id"}), 400
+        # Document type
+        if req.get("document_type_id"):
+            doc_type = document_types_collection.find_one({"_id": req["document_type_id"]})
+            req["document_type_name"] = doc_type["name"] if doc_type else "N/A"
+        else:
+            req["document_type_name"] = "N/A"
 
-    guard = security_guards.find_one({"_id": oid})
-    if guard is None:
-        return jsonify({"error": "Security guard not found"}), 404
+        # Format dates for display
+        req["request_date_formatted"] = req.get("request_date").strftime("%B %d, %Y %I:%M %p") if req.get("request_date") else "N/A"
+        req["completed_date_formatted"] = req.get("completed_date").strftime("%B %d, %Y %I:%M %p") if req.get("completed_date") else "N/A"
 
-    guard_response = serialize(guard)
-    guard_response.pop("password_hash", None)
-    return jsonify(guard_response)
+        # Default remarks if empty
+        req["remarks"] = req.get("remarks", "")
 
+    # Fetch all users & document types for possible filters or modals
+    users = list(users_collection.find())
+    document_types = list(document_types_collection.find())
 
-@app.route("/api/security/<guard_id>/stats", methods=["GET"])
-def security_guard_stats(guard_id):
-    """How many vehicle entries this guard logged today and this month (local time)."""
-    oid = to_object_id(guard_id)
-    if oid is None:
-        return jsonify({"error": "Invalid guard id"}), 400
-    if security_guards.find_one({"_id": oid}, {"_id": 1}) is None:
-        return jsonify({"error": "Security guard not found"}), 404
-
-    now_local = datetime.now(LOCAL_TZ)
-    day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    month_start = day_start.replace(day=1)
-
-    today = entry_exit_logs.count_documents(
-        {"guard_id": guard_id, "entry_time": {"$gte": day_start}}
+    return render_template(
+        "document-requests.html",
+        requests=requests,
+        users=users,
+        document_types=document_types
     )
-    this_month = entry_exit_logs.count_documents(
-        {"guard_id": guard_id, "entry_time": {"$gte": month_start}}
+
+
+@app.route("/admin/feedbacks")
+def admin_feedbacks():
+    return render_template("feedbacks.html")
+
+
+@app.route("/admin/reports")
+def admin_reports():
+    return render_template("reports.html")
+
+
+@app.route("/admin/students")
+def admin_students():
+    """Admin page listing all students (users with role 'client')."""
+    return render_template("students.html")
+
+
+# -----------------------------
+# DOCUMENT REQUESTS CRUD
+# -----------------------------
+# Create new request (AJAX)
+@app.route("/api/request/create", methods=["POST"])
+def api_create_request():
+    data = request.json
+    user_id = data.get("user_id")
+    document_type_id = data.get("document_type_id")
+    reason = data.get("reason")
+
+    new_req = {
+        "user_id": ObjectId(user_id) if user_id else None,
+        "document_type_id": ObjectId(document_type_id) if document_type_id else None,
+        "reason": reason,
+        "status": "Pending",
+        "request_date": datetime.now(),
+        "completed_date": None,
+        "remarks": ""
+    }
+    result = document_requests_collection.insert_one(new_req)
+    return jsonify({"success": True, "request_id": str(result.inserted_id)})
+
+
+# Update request status with multi-step workflow
+# (approve -> On Process, ready -> Ready to Claim, complete -> Completed, decline -> Declined)
+@app.route("/api/request/update/<request_id>", methods=["POST"])
+def api_update_request(request_id):
+    data = request.json or {}
+    action = data.get("action")  # approve, decline, ready, complete
+    remarks = (data.get("remarks") or "").strip()
+
+    if action not in ("approve", "decline", "ready", "complete"):
+        return jsonify({"success": False, "message": "Invalid action"}), 400
+
+    # Remarks are mandatory only when declining
+    if action == "decline" and not remarks:
+        return jsonify({"success": False, "message": "Remarks are required when declining a request."}), 400
+
+    update_data = {}
+    # Only save remarks when provided, so existing remarks are not wiped
+    if remarks:
+        update_data["remarks"] = remarks
+
+    # Define status transitions based on action
+    if action == "approve":
+        update_data["status"] = "On Process"
+    elif action == "decline":
+        update_data["status"] = "Declined"
+        update_data["completed_date"] = datetime.now()
+    elif action == "ready":
+        update_data["status"] = "Ready to Claim"
+    elif action == "complete":
+        update_data["status"] = "Completed"
+        update_data["completed_date"] = datetime.now()
+
+    document_requests_collection.update_one(
+        {"_id": ObjectId(request_id)},
+        {"$set": update_data}
     )
-    return jsonify({"today": today, "this_month": this_month})
+    return jsonify({"success": True})
+
+@app.route("/api/list-requests")
+def api_list_requests():
+    requests = list(document_requests_collection.find().sort("request_date", -1))
+
+    # Feedback is matched strictly to the request it was submitted for.
+    # Sorted oldest -> newest so that, if several exist, the newest wins.
+    feedback_by_request = {}
+    for fb in feedback_collection.find({"request_id": {"$ne": None}}).sort("date_submitted", 1):
+        feedback_by_request[fb["request_id"]] = fb
+
+    result = []
+
+    for req in requests:
+        # Requester (account that submitted the request)
+        user_name = "N/A"
+        if req.get("user_id"):
+            user = users_collection.find_one({"_id": req["user_id"]})
+            if user:
+                user_name = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+
+        # Student name (provided in the request)
+        student_name = req.get("student_name", "N/A")
+
+        # Document type (stored as string in request)
+        document_type_name = req.get("document_type", "N/A")
+
+        # Format request date
+        request_date = req.get("request_date")
+        request_date_formatted = request_date.strftime("%B %d, %Y") if request_date else "N/A"
+        request_date_iso = request_date.strftime("%Y-%m-%d") if request_date else ""
+
+        # Only feedback that belongs to THIS request (no fallback to other requests)
+        fb = feedback_by_request.get(req["_id"])
+
+        result.append({
+            "_id": str(req["_id"]),
+            # Readable request ID shown instead of the row count, e.g. REQ-A3F9C1
+            "request_id": format_request_id(req["_id"]),
+            "user_name": user_name,             # for admin table column: Requester
+            "student_name": student_name,
+            "document_type_name": document_type_name,
+            "reason": req.get("reason", ""),
+            "status": req.get("status", "Pending"),
+            "remarks": req.get("remarks", ""),
+            "feedback_rating": fb.get("rating") if fb else None,
+            "feedback_comments": fb.get("comments", "") if fb else "",
+            # When the feedback was submitted (shown in the feedback details modal)
+            "feedback_date": (
+                fb["date_submitted"].strftime("%B %d, %Y %I:%M %p")
+                if fb and fb.get("date_submitted") else ""
+            ),
+            "request_date_formatted": request_date_formatted,
+            "request_date_iso": request_date_iso
+        })
+
+    resp = jsonify(result)
+    # Make sure the browser never serves a cached copy of this list
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.route("/api/list-feedbacks")
+def api_list_feedbacks():
+    feedbacks = list(feedback_collection.find().sort("date_submitted", -1))
+    result = []
+
+    for fb in feedbacks:
+        date = fb.get("date_submitted")
+        formatted_date = date.strftime("%B %d, %Y %I:%M %p") if date else "N/A"
+
+        # Same readable ID the admin Document Requests page shows (e.g. REQ-A3F9C1).
+        # Empty string when the feedback isn't tied to a request (e.g. visitor feedback).
+        linked_request = fb.get("request_id")
+
+        result.append({
+            "_id": str(fb["_id"]),
+            "request_id": format_request_id(linked_request) if linked_request else "",
+            "user_name": fb.get("user_name", "N/A"),
+            "rating": fb.get("rating", 0),
+            "comments": fb.get("comments") or "",   # never null, so the page can't break on it
+            "status": fb.get("status", "New"),
+            "date_submitted": formatted_date
+        })
+
+    return jsonify(result)
 
 
-@app.route("/api/security/<guard_id>/password", methods=["PATCH"])
-def change_security_password(guard_id):
-    """Change a guard's password. Requires the current password."""
-    oid = to_object_id(guard_id)
-    if oid is None:
-        return jsonify({"error": "Invalid guard id"}), 400
+# -----------------------------
+# STUDENTS MASTER LIST + IMPORT
+# -----------------------------
 
-    data = request.get_json(silent=True) or {}
-    current_password = str(data.get("currentPassword", ""))
-    new_password = str(data.get("newPassword", ""))
-
-    if not current_password or not new_password:
-        return jsonify({"error": "Current and new password are required."}), 400
-    if len(new_password) < 8:
-        return jsonify({"error": "New password must be at least 8 characters."}), 400
-
-    guard = security_guards.find_one({"_id": oid})
-    if guard is None:
-        return jsonify({"error": "Security guard not found"}), 404
-    if not check_password_hash(guard["password_hash"], current_password):
-        return jsonify({"error": "Current password is incorrect."}), 401
-
-    security_guards.update_one(
-        {"_id": oid},
-        {"$set": {"password_hash": generate_password_hash(new_password)}},
-    )
-    return jsonify({"updated": True})
+def _normalize(value):
+    """Lowercase/trim/collapse-whitespace helper for matching."""
+    return " ".join((value or "").strip().lower().split())
 
 
-# ── API: QR scanning (security) ──────────────────────────────────────────────
-def find_motorcycle_from_code(code):
-    """Resolve whatever a QR code contains to a motorcycle document.
+def _name_pattern(parts):
+    """Case-insensitive, whitespace-tolerant regex for a list of name parts."""
+    return r"^\s*" + r"\s+".join(re.escape(p) for p in parts) + r"\s*$"
 
-    Accepts a JSON object ({"motorcycle_id": ...} / {"id": ...} / {"plate": ...}),
-    a bare motorcycle id, a bare plate number, or a URL ending in either.
-    """
-    code = str(code or "").strip()
-    if not code:
+
+# Birthday formats that may appear in imported master list files.
+BIRTHDAY_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d",
+                    "%B %d, %Y", "%b %d, %Y")
+
+
+def _normalize_birthday(value):
+    """Turn a birthday string in any common format into YYYY-MM-DD.
+    Returns None if it can't be read as a real date."""
+    value = (value or "").strip()
+    if not value:
         return None
-
-    ids, plates = [], []
-    try:
-        parsed = json.loads(code)
-    except ValueError:
-        parsed = None
-
-    if isinstance(parsed, dict):
-        for key in ("motorcycle_id", "motorcycleId", "id"):
-            if parsed.get(key):
-                ids.append(str(parsed[key]).strip())
-        if parsed.get("plate"):
-            plates.append(str(parsed["plate"]).strip().upper())
-    else:
-        token = code.rstrip("/").rsplit("/", 1)[-1]
-        ids.append(token)
-        plates.append(token.upper())
-
-    for raw in ids:
-        oid = to_object_id(raw)
-        if oid is not None:
-            doc = motorcycles.find_one({"_id": oid})
-            if doc:
-                return doc
-    for plate in plates:
-        doc = motorcycles.find_one({"plate": plate})
-        if doc:
-            return doc
+    # Handle values like "2008-03-15 00:00:00" or "2008-03-15T00:00:00"
+    candidates = {value, re.split(r"[T ]", value)[0]}
+    for candidate in candidates:
+        for fmt in BIRTHDAY_FORMATS:
+            try:
+                return datetime.strptime(candidate, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
     return None
 
 
-@app.route("/api/scan/lookup", methods=["GET"])
-def scan_lookup():
-    """Look up the motorcycle, owner and in/out state for a scanned QR code."""
-    code = request.args.get("code", "")
-    moto = find_motorcycle_from_code(code)
-    if moto is None:
-        # An unrecognized QR code is itself a denied/unverified scan attempt
-        # (e.g. an unregistered vehicle, a damaged code, or tampering), so
-        # it's logged the same way refused entries/exits are below.
-        denied_scans.insert_one({
-            "code": code.strip()[:200],
-            "plate": "",
-            "reason": "unregistered",
-            "time": datetime.now(timezone.utc),
+def matches_master_list(first_name, last_name, email, birthday):
+    """True only if first name, last name, email AND birthday all match
+    the same row in the imported master list.
+
+    Names are compared case-insensitively, ignoring extra spaces.
+    `birthday` must already be YYYY-MM-DD."""
+    email_norm = _normalize(email)
+    name_norm = _normalize(f"{first_name} {last_name}")
+    if not email_norm or not name_norm or not birthday:
+        return False
+
+    # Imports can contain duplicate rows, so check every row with this email.
+    candidates = master_students_collection.find({
+        "email": {"$regex": f"^{re.escape(email_norm)}$", "$options": "i"}
+    })
+
+    for row in candidates:
+        row_name = row.get("full_name") or f"{row.get('firstname','')} {row.get('lastname','')}"
+        if (
+            _normalize(row_name) == name_norm
+            and _normalize_birthday(row.get("birthday")) == birthday
+        ):
+            return True
+
+    return False
+
+
+def is_already_registered(first_name, last_name, email):
+    """True if a user account already exists with this email, or a client
+    account already exists with the same first + last name
+    (case-insensitive, ignoring extra spaces)."""
+    if email and users_collection.find_one({"email": email}):
+        return True
+
+    first_parts = first_name.split()
+    last_parts = last_name.split()
+    if not first_parts or not last_parts:
+        return False
+
+    return users_collection.find_one({
+        "role": "client",
+        "firstname": {"$regex": _name_pattern(first_parts), "$options": "i"},
+        "lastname": {"$regex": _name_pattern(last_parts), "$options": "i"},
+    }) is not None
+
+
+@app.route("/api/registered-accounts")
+def api_registered_accounts():
+    """
+    Always returns real client accounts from users_collection (regardless of
+    whether a master roster has been imported). Used by the frontend to
+    validate a newly-imported file against actual registered accounts.
+    """
+    students = list(users_collection.find({"role": "client"}, {"firstname": 1, "lastname": 1, "email": 1}))
+    result = [{
+        "full_name": f"{s.get('firstname','')} {s.get('lastname','')}".strip(),
+        "email": s.get("email", ""),
+    } for s in students]
+    return jsonify(result)
+
+
+@app.route("/api/list-students")
+def api_list_students():
+    """
+    Returns the Master List as a single merged view:
+
+    - Every imported roster row (master_students_collection), with
+      registration_status computed live against real client accounts
+      (matched by email, then by full name).
+    - Plus every registered client account that ISN'T already represented
+      by a roster row (so accounts aren't silently dropped just because
+      they weren't part of an import), always marked "Yes".
+
+    If nothing has ever been imported, this naturally reduces to just the
+    list of registered accounts (all "Yes"), same as before.
+    """
+    roster = list(master_students_collection.find().sort("imported_at", -1))
+    accounts = list(users_collection.find({"role": "client"}))
+
+    # Index accounts by normalized email and normalized full name so we can
+    # both (a) determine a roster row's registration_status and (b) know
+    # which accounts are already covered by the roster, so we don't list
+    # them twice.
+    accounts_by_email = {}
+    accounts_by_name = {}
+    for a in accounts:
+        email_norm = _normalize(a.get("email", ""))
+        name_norm = _normalize(f"{a.get('firstname','')} {a.get('lastname','')}")
+        if email_norm:
+            accounts_by_email[email_norm] = a
+        if name_norm:
+            accounts_by_name[name_norm] = a
+
+    matched_account_ids = set()
+    result = []
+
+    for r in roster:
+        full_name = r.get("full_name", "")
+        email = r.get("email", "")
+        email_norm = _normalize(email)
+        name_norm = _normalize(full_name)
+
+        matched_account = accounts_by_email.get(email_norm) or accounts_by_name.get(name_norm)
+
+        if matched_account:
+            matched_account_ids.add(str(matched_account["_id"]))
+
+        result.append({
+            "_id": str(r["_id"]),
+            "firstname": r.get("firstname", ""),
+            "lastname": r.get("lastname", ""),
+            "full_name": full_name,
+            "email": email,
+            "birthday": r.get("birthday", "N/A"),
+            "registration_status": "Yes" if matched_account else "No",
         })
-        return jsonify({"error": "No registered motorcycle matches this QR code."}), 404
 
-    owner = None
-    owner_oid = to_object_id(moto.get("owner_id"))
-    if owner_oid is not None:
-        owner = users.find_one({"_id": owner_oid}, {"fullName": 1, "role": 1, "idNumber": 1})
-
-    open_record = entry_exit_logs.find_one({"plate": moto["plate"], "exit_time": None})
+    # Add any registered account not already represented by a roster row.
+    for a in accounts:
+        if str(a["_id"]) in matched_account_ids:
+            continue
+        result.append({
+            "_id": str(a["_id"]),
+            "firstname": a.get("firstname", ""),
+            "lastname": a.get("lastname", ""),
+            "full_name": f"{a.get('firstname','')} {a.get('lastname','')}".strip(),
+            "email": a.get("email", "N/A"),
+            "birthday": a.get("birthday", "N/A"),
+            # Anyone who has an account in the system is considered registered.
+            "registration_status": "Yes",
+        })
 
     return jsonify({
-        "motorcycle": serialize(moto),
-        "owner": {
-            "name": (owner or {}).get("fullName") or moto.get("owner", "Unknown"),
-            "role": (owner or {}).get("role", ""),
-            "idNumber": (owner or {}).get("idNumber", ""),
-        },
-        "inside": open_record is not None,
+        "source": "combined",
+        "has_imported_roster": len(roster) > 0,
+        "students": result
     })
 
 
-@app.route("/api/scan/confirm", methods=["POST"])
-def scan_confirm():
-    """Confirm a gate entry or exit for a scanned motorcycle.
-
-    Body: {"motorcycle_id": "...", "action": "entry" | "exit", "guard_id": "..."}
-
-    Rules:
-      - Entry is only allowed for motorcycles with status "Registered"
-        (Pending, Flagged and Declined are refused).
-      - Entry is refused if the motorcycle is already inside.
-      - Exit needs an open (still inside) record.
+@app.route("/api/master-list/import", methods=["POST"])
+def api_import_master_list():
     """
-    data = request.get_json(silent=True) or {}
-    action = str(data.get("action", "")).strip().lower()
-    guard_id = str(data.get("guard_id", "")).strip()
+    Accepts a JSON array of roster rows (from the CSV/Excel import on the
+    Master List page) and inserts each one as a new document in
+    master_students_collection. Every import is inserted as new rows
+    (duplicates are allowed by design), and registration_status is always
+    recomputed live by /api/list-students rather than trusted from the client.
+    """
+    data = request.get_json(silent=True)
 
-    if action not in ("entry", "exit"):
-        return jsonify({"error": "Action must be 'entry' or 'exit'."}), 400
+    if not isinstance(data, list) or not data:
+        return jsonify({"success": False, "message": "Expected a non-empty list of student rows"}), 400
 
-    moto_oid = to_object_id(data.get("motorcycle_id"))
-    if moto_oid is None:
-        return jsonify({"error": "Invalid motorcycle id."}), 400
-    moto = motorcycles.find_one({"_id": moto_oid})
-    if moto is None:
-        return jsonify({"error": "Motorcycle not found."}), 404
+    docs_to_insert = []
+    now = datetime.now()
 
-    plate = moto["plate"]
-    now = datetime.now(timezone.utc)
+    for row in data:
+        firstname = (row.get("firstname") or "").strip()
+        lastname = (row.get("lastname") or "").strip()
+        full_name = (row.get("full_name") or "").strip()
+        email = (row.get("email") or "").strip().lower()
 
-    if action == "entry":
-        if moto.get("status") not in ("Registered", "Approved"):
-            denied_scans.insert_one({
-                "plate": plate,
-                "reason": f"status_{moto.get('status', 'unknown')}",
-                "time": now,
-            })
-            return jsonify({"error": f"Entry refused: motorcycle status is {moto.get('status', 'unknown')}."}), 403
-        if entry_exit_logs.find_one({"plate": plate, "exit_time": None}):
-            denied_scans.insert_one({
-                "plate": plate,
-                "reason": "already_inside",
-                "time": now,
-            })
-            return jsonify({"error": "This motorcycle is already inside. Confirm an exit instead."}), 409
+        # Derive whichever of firstname/lastname/full_name is missing, so
+        # both forms are always available for display and matching.
+        if not full_name and (firstname or lastname):
+            full_name = f"{firstname} {lastname}".strip()
+        elif full_name and not firstname and not lastname:
+            parts = full_name.split()
+            firstname = parts[0] if parts else ""
+            lastname = " ".join(parts[1:]) if len(parts) > 1 else ""
 
-        doc = {
-            "owner_id": moto.get("owner_id", ""),
-            "plate": plate,
-            "guard_id": guard_id,
-            "entry_time": now,
-            "exit_time": None,
-            "status": "In Progress",
-            "created_at": now,
+        # Skip completely empty rows
+        if not full_name and not email:
+            continue
+
+        docs_to_insert.append({
+            "firstname": firstname,
+            "lastname": lastname,
+            "full_name": full_name,
+            "email": email,
+            "birthday": (row.get("birthday") or "").strip(),
+            "imported_at": now,
+        })
+
+    if not docs_to_insert:
+        return jsonify({"success": False, "message": "No valid rows to import"}), 400
+
+    result = master_students_collection.insert_many(docs_to_insert)
+
+    return jsonify({
+        "success": True,
+        "inserted_count": len(result.inserted_ids)
+    })
+
+
+@app.route("/feedback/delete/<feedback_id>", methods=["POST"])
+def delete_feedback(feedback_id):
+    feedback_collection.delete_one({"_id": ObjectId(feedback_id)})
+    return redirect(url_for("admin_feedbacks"))  # fixed: endpoint is admin_feedbacks
+
+# -----------------------------
+# API ROUTES FOR REPORTS
+# -----------------------------
+
+# Document Requests count per type with filtering
+@app.route("/api/reports/documents")
+def api_reports_documents():
+    from datetime import datetime, timedelta
+
+    # Get filter parameters
+    period = request.args.get('period', 'all')
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+
+    # Build match stage based on filters
+    match_stage = {}
+
+    if start_date and end_date:
+        # Custom date range
+        match_stage["request_date"] = {
+            "$gte": datetime.fromisoformat(start_date),
+            "$lte": datetime.fromisoformat(end_date + "T23:59:59.999")
         }
-        result = entry_exit_logs.insert_one(doc)
-        record = entry_exit_logs.find_one({"_id": result.inserted_id})
-        return jsonify({"record": serialize_log(record), "action": "entry"}), 201
+    elif period != 'all':
+        # Predefined periods
+        now = datetime.now()
+        if period == 'today':
+            start = datetime(now.year, now.month, now.day)
+            match_stage["request_date"] = {"$gte": start}
+        elif period == 'week':
+            start = now - timedelta(days=now.weekday())
+            start = datetime(start.year, start.month, start.day)
+            match_stage["request_date"] = {"$gte": start}
+        elif period == 'month':
+            start = datetime(now.year, now.month, 1)
+            match_stage["request_date"] = {"$gte": start}
+        elif period == 'year':
+            start = datetime(now.year, 1, 1)
+            match_stage["request_date"] = {"$gte": start}
 
-    record = entry_exit_logs.find_one_and_update(
-        {"plate": plate, "exit_time": None},
-        {"$set": {"exit_time": now, "status": "Completed", "exit_guard_id": guard_id}},
-        sort=[("entry_time", -1)],
-        return_document=ReturnDocument.AFTER,
-    )
-    if record is None:
-        denied_scans.insert_one({
-            "plate": plate,
-            "reason": "no_open_entry",
-            "time": now,
-        })
-        return jsonify({"error": "No open entry found for this motorcycle."}), 404
-    return jsonify({"record": serialize_log(record), "action": "exit"}), 200
+    # Build pipeline
+    pipeline = []
+    if match_stage:
+        pipeline.append({"$match": match_stage})
 
+    pipeline.append({"$group": {"_id": "$document_type", "count": {"$sum": 1}}})
+    pipeline.append({"$sort": {"count": -1}})  # Sort by count descending
 
-# ── API: Entry/Exit Records ──────────────────────────────────────────────────
-@app.route("/api/entry-exit-records", methods=["GET"])
-def list_entry_exit_records():
-    """List entry/exit records, optionally scoped to one owner and filtered.
+    result = list(document_requests_collection.aggregate(pipeline))
 
-    Query params:
-        owner_id  - restrict to one user's records
-        q         - text search against plate or status
-        date      - exact date filter, YYYY-MM-DD
-        range     - "week" or "month", ignored if 'date' is also given
-        page      - 1-indexed page number (default 1)
-        page_size - records per page, max 100 (default 10)
-    """
-    query = build_log_query(request.args)
-
-    try:
-        page = max(1, int(request.args.get("page", 1)))
-    except ValueError:
-        page = 1
-    try:
-        page_size = max(1, min(100, int(request.args.get("page_size", 10))))
-    except ValueError:
-        page_size = 10
-
-    total = entry_exit_logs.count_documents(query)
-    docs = (
-        entry_exit_logs.find(query)
-        .sort("entry_time", -1)
-        .skip((page - 1) * page_size)
-        .limit(page_size)
-    )
-    records = [serialize_log(d) for d in docs]
-
-    return jsonify({"records": records, "total": total, "page": page, "page_size": page_size})
-
-
-@app.route("/api/entry-exit-records", methods=["POST"])
-def create_entry_record():
-    """Log a new gate entry (time_in = now, status = In Progress).
-
-    Intended for the security/gate-scanning side of the app (e.g. an admin
-    or kiosk scanning a QR code at the gate) rather than for students to
-    call directly.
-    """
-    data = request.get_json(silent=True) or {}
-    owner_id = str(data.get("owner_id", "")).strip()
-    plate = str(data.get("plate", "")).strip().upper()
-
-    if not owner_id or not plate:
-        return jsonify({"error": "owner_id and plate are required."}), 400
-
-    doc = {
-        "owner_id": owner_id,
-        "plate": plate,
-        "guard_id": str(data.get("guard_id", "")).strip(),  # who scanned it (optional)
-        "entry_time": datetime.now(timezone.utc),
-        "exit_time": None,
-        "status": "In Progress",
-        "created_at": datetime.now(timezone.utc),
+    # Format for chart.js
+    data = {
+        "labels": [r["_id"] for r in result],
+        "counts": [r["count"] for r in result]
     }
-    result = entry_exit_logs.insert_one(doc)
-    return jsonify(serialize_log(entry_exit_logs.find_one({"_id": result.inserted_id}))), 201
+    return jsonify(data)
 
 
-@app.route("/api/entry-exit-records/<record_id>/exit", methods=["PATCH"])
-def close_entry_record(record_id):
-    """Mark an open record's exit time, completing it."""
-    oid = to_object_id(record_id)
-    if oid is None:
-        return jsonify({"error": "Invalid record id"}), 400
+# Feedback ratings distribution with filtering
+@app.route("/api/reports/feedbacks")
+def report_feedbacks():
+    from datetime import datetime, timedelta
 
-    doc = entry_exit_logs.find_one_and_update(
-        {"_id": oid, "exit_time": None},
-        {"$set": {"exit_time": datetime.now(timezone.utc), "status": "Completed"}},
-        return_document=ReturnDocument.AFTER,
-    )
-    if doc is None:
-        return jsonify({"error": "Open (still-in-progress) record not found."}), 404
-    return jsonify(serialize_log(doc))
+    # Get filter parameters
+    period = request.args.get('period', 'all')
+    rating_filter = request.args.get('rating', 'all')
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
 
+    # Build match stage based on filters
+    match_stage = {}
 
-@app.route("/api/security/logs", methods=["GET"])
-def security_monitoring_logs():
-    """Live feed of individual entry/exit events campus-wide, for the
-    security Monitoring Logs page.
+    # Date filtering (using date_submitted field)
+    if start_date and end_date:
+        # Custom date range - include the entire end date
+        match_stage["date_submitted"] = {
+            "$gte": datetime.fromisoformat(start_date),
+            "$lte": datetime.fromisoformat(end_date + "T23:59:59.999")
+        }
+    elif period != 'all':
+        # Predefined periods
+        now = datetime.now()
+        if period == 'today':
+            start = datetime(now.year, now.month, now.day)
+            match_stage["date_submitted"] = {"$gte": start}
+        elif period == 'week':
+            start = now - timedelta(days=now.weekday())
+            start = datetime(start.year, start.month, start.day)
+            match_stage["date_submitted"] = {"$gte": start}
+        elif period == 'month':
+            start = datetime(now.year, now.month, 1)
+            match_stage["date_submitted"] = {"$gte": start}
+        elif period == 'year':
+            start = datetime(now.year, 1, 1)
+            match_stage["date_submitted"] = {"$gte": start}
 
-    Unlike /api/security/dashboard's 'recent' list (owner/plate/time/type
-    only, for the small dashboard widget), this includes the motorcycle's
-    make/model and the name of whichever guard scanned that specific event
-    — entry and exit can be scanned by different guards, so guard_id and
-    exit_guard_id are resolved separately per event.
-    """
-    try:
-        limit = max(1, min(50, int(request.args.get("limit", 20))))
-    except ValueError:
-        limit = 20
+    # Rating filtering
+    if rating_filter != 'all':
+        match_stage["rating"] = int(rating_filter)
 
-    events = []
-    for d in entry_exit_logs.find().sort("entry_time", -1).limit(limit):
-        events.append((d["entry_time"], "entry", d))
-    for d in (
-        entry_exit_logs.find({"exit_time": {"$ne": None}})
-        .sort("exit_time", -1)
-        .limit(limit)
-    ):
-        events.append((d["exit_time"], "exit", d))
-    events.sort(key=lambda e: _to_local(e[0]), reverse=True)
-    events = events[:limit]
+    # Build pipeline
+    pipeline = []
+    if match_stage:
+        pipeline.append({"$match": match_stage})
 
-    owner_oids = [to_object_id(d.get("owner_id")) for _, _, d in events]
-    owner_oids = [o for o in owner_oids if o is not None]
-    owners = {
-        str(u["_id"]): u.get("fullName", "Unknown")
-        for u in users.find({"_id": {"$in": owner_oids}}, {"fullName": 1})
-    }
+    pipeline.extend([
+        {"$group": {"_id": "$rating", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}}
+    ])
 
-    plates = list({d.get("plate", "") for _, _, d in events if d.get("plate")})
-    motos = {
-        m["plate"]: m
-        for m in motorcycles.find({"plate": {"$in": plates}}, {"plate": 1, "brand": 1, "model": 1})
-    }
+    data = list(feedback_collection.aggregate(pipeline))
 
-    guard_ids = []
-    for _, kind, d in events:
-        gid = d.get("guard_id") if kind == "entry" else d.get("exit_guard_id")
-        if gid:
-            guard_ids.append(gid)
-    guard_oids = [to_object_id(g) for g in guard_ids]
-    guard_oids = [o for o in guard_oids if o is not None]
-    guard_names = {
-        str(g["_id"]): g.get("fullName", "Unknown")
-        for g in security_guards.find({"_id": {"$in": guard_oids}}, {"fullName": 1})
-    }
-
-    logs = []
-    for t, kind, d in events:
-        plate = d.get("plate", "")
-        moto = motos.get(plate, {})
-        gid = d.get("guard_id") if kind == "entry" else d.get("exit_guard_id")
-        logs.append({
-            "owner": owners.get(d.get("owner_id"), "Unknown"),
-            "plate": plate,
-            "vehicle": f"{moto.get('brand', '')} {moto.get('model', '')}".strip(),
-            "type": kind,
-            "time": _to_local(t).strftime("%I:%M %p").lstrip("0"),
-            "guard": guard_names.get(gid, "Unknown") if gid else "Unknown",
-        })
-
-    return jsonify({"logs": logs})
-
-
-# ── API: Reports & Analytics ──────────────────────────────────────────────────
-@app.route("/api/reports/summary", methods=["GET"])
-def reports_summary():
-    """Aggregated numbers for the Reports & Analytics page.
-
-    Query params:
-        days - how many trailing days (including today) to summarize.
-               Clamped to 1-365, default 30.
-
-    Returns daily entries/exits/denied-scan counts over the range, a
-    24-hour scan-volume histogram over the range, an hour-by-hour "vehicles
-    inside campus" snapshot for *today* (always today, regardless of
-    'days'), a registration-status breakdown across all motorcycles, and a
-    detailed 'records' list (date / owner / plate / brand / model / time in /
-    time out) for the latest 1,000 entries in the range.
-    """
-    try:
-        days = max(1, min(365, int(request.args.get("days", 30))))
-    except ValueError:
-        days = 30
-
-    now_local = datetime.now(LOCAL_TZ)
-    today_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    range_start_local = today_local - timedelta(days=days - 1)
-    range_start_utc = range_start_local.astimezone(timezone.utc).replace(tzinfo=None)
-
-    day_keys, day_labels = [], []
-    for i in range(days):
-        d = range_start_local + timedelta(days=i)
-        day_keys.append(d.strftime("%Y-%m-%d"))
-        day_labels.append(f"{d.strftime('%b')} {d.day}")
-
-    entries_by_day = {k: 0 for k in day_keys}
-    exits_by_day = {k: 0 for k in day_keys}
-    denied_by_day = {k: 0 for k in day_keys}
-    hour_counts = [0] * 24  # combined entry+exit scan volume, by hour of day
-
-    for doc in entry_exit_logs.find({"entry_time": {"$gte": range_start_utc}}, {"entry_time": 1}):
-        et = doc.get("entry_time")
-        if not et:
-            continue
-        local = _to_local(et)
-        key = local.strftime("%Y-%m-%d")
-        if key in entries_by_day:
-            entries_by_day[key] += 1
-        hour_counts[local.hour] += 1
-
-    for doc in entry_exit_logs.find({"exit_time": {"$gte": range_start_utc}}, {"exit_time": 1}):
-        xt = doc.get("exit_time")
-        if not xt:
-            continue
-        local = _to_local(xt)
-        key = local.strftime("%Y-%m-%d")
-        if key in exits_by_day:
-            exits_by_day[key] += 1
-        hour_counts[local.hour] += 1
-
-    for doc in denied_scans.find({"time": {"$gte": range_start_utc}}, {"time": 1}):
-        t = doc.get("time")
-        if not t:
-            continue
-        local = _to_local(t)
-        key = local.strftime("%Y-%m-%d")
-        if key in denied_by_day:
-            denied_by_day[key] += 1
-
-    hour_labels = [datetime(2000, 1, 1, h).strftime("%I%p").lstrip("0") for h in range(24)]
-
-    # "Vehicles inside" is always a snapshot of *today*, independent of the
-    # days filter above — a 90-day trend line for it wouldn't mean much.
-    start_hour, end_hour = 6, min(now_local.hour, 18)
-    inside_hour_labels, inside_counts = [], []
-    for h in range(start_hour, end_hour + 1):
-        boundary_local = today_local.replace(hour=h)
-        boundary_utc = boundary_local.astimezone(timezone.utc).replace(tzinfo=None)
-        count = entry_exit_logs.count_documents({
-            "entry_time": {"$lte": boundary_utc},
-            "$or": [{"exit_time": None}, {"exit_time": {"$gt": boundary_utc}}],
-        })
-        inside_hour_labels.append(boundary_local.strftime("%I%p").lstrip("0"))
-        inside_counts.append(count)
-
-    active = motorcycles.count_documents({"status": {"$in": ["Registered", "Approved"]}})
-    pending = motorcycles.count_documents({"status": "Pending"})
-    flagged = motorcycles.count_documents({"status": {"$in": ["Flagged", "Declined"]}})
-
-    # ── Detailed records: owner / brand / model per entry in range ──────────
-    log_docs = list(
-        entry_exit_logs.find({"entry_time": {"$gte": range_start_utc}})
-        .sort("entry_time", -1)
-        .limit(1000)
-    )
-    record_plates = list({d.get("plate", "") for d in log_docs if d.get("plate")})
-    moto_map = {
-        m["plate"]: m
-        for m in motorcycles.find(
-            {"plate": {"$in": record_plates}},
-            {"plate": 1, "owner": 1, "brand": 1, "model": 1},
-        )
-    }
-    owner_oids = [to_object_id(d.get("owner_id")) for d in log_docs if d.get("owner_id")]
-    owner_oids = [o for o in owner_oids if o is not None]
-    owner_names = {
-        str(u["_id"]): u.get("fullName", "")
-        for u in users.find({"_id": {"$in": owner_oids}}, {"fullName": 1})
-    }
-
-    records = []
-    for d in log_docs:
-        plate = d.get("plate", "")
-        moto = moto_map.get(plate, {})
-        entry_local = _to_local(d["entry_time"]) if d.get("entry_time") else None
-        exit_local = _to_local(d["exit_time"]) if d.get("exit_time") else None
-        records.append({
-            "date": entry_local.strftime("%b %d, %Y") if entry_local else "",
-            "owner": owner_names.get(d.get("owner_id")) or moto.get("owner", "Unknown"),
-            "plate": plate,
-            "brand": moto.get("brand", ""),
-            "model": moto.get("model", ""),
-            "time_in": entry_local.strftime("%I:%M %p").lstrip("0") if entry_local else "—",
-            "time_out": exit_local.strftime("%I:%M %p").lstrip("0") if exit_local else "—",
-        })
+    # Always keep 1–5 slots even if empty
+    labels = ["1", "2", "3", "4", "5"]
+    counts_map = {str(d["_id"]): d["count"] for d in data}
+    counts = [counts_map.get(str(i), 0) for i in range(1, 6)]
 
     return jsonify({
-        "days": days,
-        "day_labels": day_labels,
-        "daily_entries": [entries_by_day[k] for k in day_keys],
-        "daily_exits": [exits_by_day[k] for k in day_keys],
-        "denied_counts": [denied_by_day[k] for k in day_keys],
-        "hour_labels": hour_labels,
-        "peak_hour_counts": hour_counts,
-        "inside_hour_labels": inside_hour_labels,
-        "inside_counts": inside_counts,
-        "registration_status": {"active": active, "pending": pending, "flagged": flagged},
-        "records": records,
+        "labels": labels,
+        "counts": counts
     })
 
 
-# ── API: Admin — login ───────────────────────────────────────────────────────
-@app.route("/api/admin/login", methods=["POST"])
-def login_admin():
-    """Sign in an admin by username or email.
-
-    Returns the admin's profile (never the password hash). The admin pages
-    keep it in sessionStorage as 'adminUser'.
-    """
-    data = request.get_json(silent=True) or {}
-    identifier = str(data.get("identifier", "")).strip().lower()
-    password = str(data.get("password", ""))
-
-    if not identifier or not password:
-        return jsonify({"error": "Username/email and password are required."}), 400
-
-    admin = admins.find_one({"$or": [{"username": identifier}, {"email": identifier}]})
-    # Same generic message whether the account is missing or the password is
-    # wrong, so we don't reveal which usernames exist.
-    if admin is None or not check_password_hash(admin["password_hash"], password):
-        return jsonify({"error": "Incorrect username/email or password."}), 401
-
-    admin_response = serialize(admin)
-    admin_response.pop("password_hash", None)
-    admin_response.pop("created_at", None)
-    return jsonify({"admin": admin_response}), 200
+@app.route("/api/reports/requests-per-month")
+def requests_per_month():
+    pipeline = [
+        {"$group": {
+            "_id": {"$month": "$request_date"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    result = list(document_requests_collection.aggregate(pipeline))
+    months = [r["_id"] for r in result]
+    counts = [r["count"] for r in result]
+    return jsonify({"months": months, "counts": counts})
 
 
-# ── API: Admin — user management & registration approval ────────────────────
-ALLOWED_APPROVALS = {"Approved", "Declined"}
+@app.route("/api/reports/top-documents")
+def top_documents():
+    pipeline = [
+        {"$group": {
+            "_id": "$document_type_id",
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}}
+    ]
+    result = list(document_requests_collection.aggregate(pipeline))
+    labels, values = [], []
+    for r in result:
+        doc = document_types_collection.find_one({"_id": ObjectId(r["_id"])})
+        labels.append(doc["name"] if doc else "Unknown")
+        values.append(r["count"])
+    return jsonify({"labels": labels, "values": values})
 
 
-def _collection_for(kind):
-    return {"user": users, "guard": security_guards}.get(kind)
+@app.route("/api/reports/ratings")
+def ratings_chart():
+    pipeline = [
+        {"$group": {
+            "_id": "$rating",
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    result = list(feedback_collection.aggregate(pipeline))
+    ratings = [r["_id"] for r in result]
+    counts = [r["count"] for r in result]
+    return jsonify({"ratings": ratings, "counts": counts})
 
 
-def _iso_utc(dt):
-    if not dt:
+# -----------------------------
+# CLIENT ROUTES
+# -----------------------------
+
+@app.route("/client/login", methods=["GET", "POST"])
+def client_login():
+    if request.method == "POST":
+        email = request.form.get("email", "").lower().strip()
+        password = request.form.get("password")
+
+        user = users_collection.find_one({"email": email})
+
+        if not user:
+            flash("User not found. Please check your email.", "danger")
+            return redirect(url_for("client_login"))
+
+        if not check_password_hash(user["password"], password):
+            flash("Incorrect password. Please try again.", "danger")
+            return redirect(url_for("client_login"))
+
+        # Save session
+        session["client_user_id"] = str(user["_id"])
+        session["client_user_name"] = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+
+        flash("Login successful!", "success")
+        return redirect(url_for("client_home"))
+
+    return render_template("client-login.html")
+
+@app.route("/client/register", methods=["GET", "POST"])
+def client_register():
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        email = request.form.get("email", "").lower().strip()
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        birthday = request.form.get("birthday", "").strip()
+
+        # NOTE: School Year / Year Level / Section are commented out in
+        # client-register.html, so they are optional here. If you re-enable
+        # those fields in the form, they will be saved automatically.
+        school_year = request.form.get("school_year", "").strip()
+        year = request.form.get("year", "").strip()
+        section = request.form.get("section", "").strip()
+
+        # basic validation
+        if not first_name or not last_name or not email or not password or not confirm_password or not birthday:
+            flash("All fields are required.", "danger")
+            return redirect(url_for("client_register"))
+
+        # birthday is typed as mm/dd/yyyy (YYYY-MM-DD is also accepted) and must
+        # be a real date that is not in the future
+        birthday_date = None
+        for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+            try:
+                birthday_date = datetime.strptime(birthday, fmt)
+                break
+            except ValueError:
+                continue
+
+        if birthday_date is None:
+            flash("Please enter a valid birthday (mm/dd/yyyy).", "danger")
+            return redirect(url_for("client_register"))
+
+        if birthday_date.date() > datetime.now().date():
+            flash("Birthday cannot be in the future.", "danger")
+            return redirect(url_for("client_register"))
+
+        # Always store as YYYY-MM-DD so the Master List page and imports keep working
+        birthday = birthday_date.strftime("%Y-%m-%d")
+
+        # server-side password confirmation (client-side JS can be bypassed)
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return redirect(url_for("client_register"))
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "danger")
+            return redirect(url_for("client_register"))
+
+        # ALL details (first name, last name, email, birthday) must match the
+        # same row in the master list. One generic message, so nobody can guess
+        # which field was wrong and probe the roster.
+        if not matches_master_list(first_name, last_name, email, birthday):
+            flash("We couldn't verify your details against the school's master list. "
+                  "Please make sure your name, email, and birthday are exactly as "
+                  "recorded by the school, or contact the school administrator.", "danger")
+            return redirect(url_for("client_register"))
+
+        # block duplicate accounts (same email OR same student name)
+        if is_already_registered(first_name, last_name, email):
+            flash("Account Already Registered", "danger")
+            return redirect(url_for("client_register"))
+
+        hashed = generate_password_hash(password)
+
+        new_user = {
+            "firstname": first_name,
+            "lastname": last_name,
+            "email": email,
+            "password": hashed,
+            "role": "client",
+            "birthday": birthday,
+        }
+
+        # Only store these if the form actually provided them
+        if school_year:
+            new_user["school_year"] = school_year
+        if year:
+            new_user["year"] = year
+        if section:
+            new_user["section"] = section
+
+        try:
+            users_collection.insert_one(new_user)
+        except DuplicateKeyError:
+            # Two submissions raced past the check above; the unique index caught it.
+            flash("Account Already Registered", "danger")
+            return redirect(url_for("client_register"))
+
+        flash("Account created successfully. Please login.", "success")
+        return redirect(url_for("client_login"))
+
+    return render_template("client-register.html")
+
+# -----------------------------
+# CLIENT ACCOUNT SETTINGS ROUTES
+# -----------------------------
+
+@app.route("/client/account-settings")
+def client_account_settings():
+    if "client_user_id" not in session:
+        flash("Please login to access account settings", "warning")
+        return redirect(url_for("client_login"))
+
+    user_id = session["client_user_id"]
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for("client_login"))
+
+    return render_template("client-account-settings.html", user=user)
+
+
+@app.route("/api/client/profile/update", methods=["POST"])
+def update_client_profile():
+    if "client_user_id" not in session:
+        return jsonify({"success": False, "message": "Not authenticated"}), 401
+
+    user_id = session["client_user_id"]
+    data = request.get_json()
+
+    # Get current user
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    # Check if email is being changed and if it's already taken
+    new_email = data.get("email")
+    if new_email and new_email != user["email"]:
+        existing_user = users_collection.find_one({"email": new_email})
+        if existing_user:
+            return jsonify({"success": False, "message": "Email already in use"}), 400
+
+    # Build update data
+    update_data = {}
+    if data.get("firstname"):
+        update_data["firstname"] = data["firstname"]
+    if data.get("lastname"):
+        update_data["lastname"] = data["lastname"]
+    if new_email:
+        update_data["email"] = new_email
+    if data.get("year"):
+        update_data["year"] = data["year"]
+    if data.get("section"):
+        update_data["section"] = data["section"]
+    if data.get("school_year"):
+        update_data["school_year"] = data["school_year"]
+
+    # Update user
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": update_data}
+    )
+
+    # Update session with new name if changed
+    if "firstname" in update_data or "lastname" in update_data:
+        session["client_user_name"] = f"{update_data.get('firstname', user['firstname'])} {update_data.get('lastname', user['lastname'])}".strip()
+
+    return jsonify({"success": True, "message": "Profile updated successfully"})
+
+
+@app.route("/api/client/profile/change-password", methods=["POST"])
+def change_client_password():
+    if "client_user_id" not in session:
+        return jsonify({"success": False, "message": "Not authenticated"}), 401
+
+    user_id = session["client_user_id"]
+    data = request.get_json()
+
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+    confirm_password = data.get("confirm_password")
+
+    # Validate inputs
+    if not current_password or not new_password or not confirm_password:
+        return jsonify({"success": False, "message": "All fields are required"}), 400
+
+    if new_password != confirm_password:
+        return jsonify({"success": False, "message": "New passwords do not match"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"success": False, "message": "Password must be at least 6 characters"}), 400
+
+    # Get user
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    # Verify current password
+    if not check_password_hash(user["password"], current_password):
+        return jsonify({"success": False, "message": "Current password is incorrect"}), 400
+
+    # Hash new password and update
+    hashed_password = generate_password_hash(new_password)
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password": hashed_password}}
+    )
+
+    return jsonify({"success": True, "message": "Password changed successfully"})
+
+
+@app.route("/client/home")
+def client_home():
+    return render_template("client-home.html")
+
+def get_logged_in_client_name():
+    """Full name of the logged-in client, straight from their account.
+    Returns None if nobody is logged in or the account no longer exists."""
+    if "client_user_id" not in session:
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.isoformat()
+    user = users_collection.find_one({"_id": ObjectId(session["client_user_id"])})
+    if not user:
+        return None
+    return f"{user.get('firstname','')} {user.get('lastname','')}".strip()
 
 
-def _admin_row(doc, kind):
-    return {
-        "id": str(doc["_id"]),
-        "kind": kind,  # "user" (student/staff) or "guard" (security)
-        "fullName": doc.get("fullName", ""),
-        "firstName": doc.get("firstName", ""),
-        "middleName": doc.get("middleName", ""),
-        "lastName": doc.get("lastName", ""),
-        "role": "security" if kind == "guard" else doc.get("role", ""),
-        "idNumber": doc.get("idNumber", ""),
-        "email": doc.get("email", ""),
-        "contactNumber": doc.get("contactNumber", ""),
-        "gradeLevel": doc.get("gradeLevel", ""),
-        "section": doc.get("section", ""),
-        "assignedPost": doc.get("assignedPost", ""),
-        "approval_status": doc.get("approval_status", "Approved"),
-        "created_at": _iso_utc(doc.get("created_at")),
+@app.route("/client/request-document")
+def client_request_document():
+    full_name = get_logged_in_client_name()
+    if not full_name:
+        flash("Please login to request a document.", "warning")
+        return redirect(url_for("client_login"))
+    return render_template("request-document.html", full_name=full_name)
+
+@app.route("/submit-request", methods=["POST"])
+def submit_request():
+    # Require login
+    if "client_user_id" not in session:
+        flash("Please login to submit a request.", "danger")
+        return redirect(url_for("client_login"))
+
+    # The student name always comes from the logged-in account, never from the
+    # form (a readonly input can still be edited through browser dev tools).
+    name = get_logged_in_client_name()
+    document_type = request.form.get("document_type", "").strip()
+    reason = request.form.get("reason", "").strip()
+
+    # Validation
+    if not name or not document_type or not reason:
+        flash("All fields are required.", "danger")
+        return redirect(url_for("client_request_document"))
+
+    # Build request document
+    new_request = {
+        "user_id": ObjectId(session["client_user_id"]),
+        "student_name": name,
+        "document_type": document_type,
+        "reason": reason,
+        "status": "Pending",
+        "request_date": datetime.now(),
+        "completed_date": None,
+        "remarks": ""
     }
 
+    document_requests_collection.insert_one(new_request)
 
-@app.route("/api/admin/users", methods=["GET"])
-def admin_list_users():
-    """All registered accounts (students, staff, security), newest first."""
-    rows = [_admin_row(d, "user") for d in users.find()]
-    rows += [_admin_row(d, "guard") for d in security_guards.find()]
-    rows.sort(key=lambda r: r["created_at"] or "", reverse=True)
-    return jsonify(rows)
+    flash("Your document request has been submitted successfully!", "success")
+    return redirect(url_for("client_request_status"))
 
 
-@app.route("/api/admin/users/<kind>/<user_id>/approval", methods=["PATCH"])
-def admin_set_approval(kind, user_id):
-    """Approve or decline a registration.
+@app.route("/client/track-request")
+def client_track_request():
+    return render_template("track-request.html")
 
-    Body: {"status": "Approved" | "Declined"}
-    Approving a student/staff account also approves that owner's Pending
-    motorcycles (status -> Registered) so they can pass the gate scanner.
-    """
-    col = _collection_for(kind)
-    oid = to_object_id(user_id)
-    if col is None or oid is None:
-        return jsonify({"error": "Invalid account."}), 400
+@app.route("/client/request-status")
+def client_request_status():
+    if "client_user_id" not in session:
+        flash("Please login to view your requests.", "danger")
+        return redirect(url_for("client_login"))
 
-    data = request.get_json(silent=True) or {}
-    status = data.get("status")
-    if status not in ALLOWED_APPROVALS:
-        return jsonify({"error": "Status must be 'Approved' or 'Declined'."}), 400
+    user_id = ObjectId(session["client_user_id"])
 
-    now = datetime.now(timezone.utc)
-    doc = col.find_one_and_update(
-        {"_id": oid},
-        {"$set": {"approval_status": status, "reviewed_at": now}},
-        return_document=ReturnDocument.AFTER,
+    requests = list(document_requests_collection.find({
+        "user_id": user_id
+    }).sort("request_date", -1))   # newest first
+
+    # This user's feedback, keyed by the request it belongs to.
+    # Sorted oldest -> newest so the newest wins if there are several.
+    feedback_by_request = {}
+    for fb in feedback_collection.find(
+        {"user_id": user_id, "request_id": {"$ne": None}}
+    ).sort("date_submitted", 1):
+        feedback_by_request[fb["request_id"]] = fb
+
+    # Normalize fields for template
+    for r in requests:
+        fb = feedback_by_request.get(r["_id"])   # must run BEFORE _id is stringified
+        r["has_feedback"] = fb is not None
+        # Details shown in the "View Details" popup on the Track Requests page
+        r["feedback"] = {
+            "rating": fb.get("rating", 0),
+            "comments": fb.get("comments") or "",
+            "date": fb["date_submitted"].strftime("%B %d, %Y %I:%M %p")
+                    if fb.get("date_submitted") else "N/A",
+        } if fb else None
+
+        r["request_id"] = format_request_id(r["_id"])  # same ID the admin sees
+        r["_id"] = str(r["_id"])   # convert ObjectId to string
+        r["created_at"] = r.get("request_date")  # match your HTML
+
+    return render_template(
+        "request-status.html",
+        requests=requests
     )
-    if doc is None:
-        return jsonify({"error": "Account not found."}), 404
 
-    motorcycles_approved = 0
-    if kind == "user" and status == "Approved":
-        result = motorcycles.update_many(
-            {"owner_id": user_id, "status": "Pending"},
-            {"$set": {"status": "Registered", "updated_at": now}},
+
+@app.route("/client/feedback", methods=["GET", "POST"])
+def client_feedback():
+    if "client_user_id" not in session:
+        flash("Please login to submit feedback.", "warning")
+        return redirect(url_for("client_login"))
+
+    user_id = session["client_user_id"]
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    user_name = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+
+    # Request id comes from ?request=... (GET, via the "Give Feedback" button)
+    # or from the hidden form input named request_id (POST).
+    raw_request_id = request.values.get("request_id") or request.args.get("request") or ""
+    linked_request_id = None
+    if raw_request_id:
+        try:
+            # Make sure the request exists and belongs to this user
+            req_doc = document_requests_collection.find_one({
+                "_id": ObjectId(raw_request_id),
+                "user_id": ObjectId(user_id)
+            })
+            if req_doc:
+                linked_request_id = req_doc["_id"]
+        except Exception:
+            pass
+
+    # Fallback: if the form didn't send a (valid) request id, link the feedback
+    # to this user's newest request that has no feedback yet, so the admin
+    # table can always show the stars for it.
+    if not linked_request_id:
+        already_reviewed = feedback_collection.distinct(
+            "request_id",
+            {"user_id": ObjectId(user_id), "request_id": {"$ne": None}}
         )
-        motorcycles_approved = result.modified_count
+        latest_req = document_requests_collection.find_one(
+            {"user_id": ObjectId(user_id), "_id": {"$nin": already_reviewed}},
+            sort=[("request_date", -1)]
+        )
+        if latest_req:
+            linked_request_id = latest_req["_id"]
 
-    return jsonify({
-        "account": _admin_row(doc, kind),
-        "motorcycles_approved": motorcycles_approved,
-    })
+    if request.method == "POST":
+        try:
+            rating = int(request.form.get("rating", 0))
+        except ValueError:
+            rating = 0
+        # Accept the textarea under either name ("comments" or "message", which
+        # the visitor form uses), so the comment is never lost to a name mismatch.
+        comments = (request.form.get("comments") or request.form.get("message") or "").strip()
+
+        # A rating of 1-5 is required, otherwise the stars would stay gray
+        if rating < 1 or rating > 5:
+            flash("Please select a rating.", "danger")
+            if raw_request_id:
+                return redirect(url_for("client_feedback", request=raw_request_id))
+            return redirect(url_for("client_feedback"))
+
+        # One feedback per request
+        if linked_request_id and feedback_collection.find_one({
+            "user_id": ObjectId(user_id), "request_id": linked_request_id
+        }):
+            flash("You already submitted feedback for this request.", "info")
+            return redirect(url_for("client_request_status"))
+
+        new_feedback = {
+            "user_id": ObjectId(user_id),
+            "request_id": linked_request_id,   # None if given without a request
+            "user_name": user_name,
+            "rating": rating,
+            "comments": comments,
+            "date_submitted": datetime.now(),
+            "status": "New"  # optional field
+        }
+        feedback_collection.insert_one(new_feedback)
+        flash("Thank you for your feedback!", "success")
+        return redirect(url_for("client_feedback_thank_you"))
+
+    return render_template(
+        "client-feedback.html",
+        user_name=user_name,
+        request_id=str(linked_request_id) if linked_request_id else ""
+    )
+
+@app.route("/client/logout")
+def client_logout():
+    session.pop("client_user_id", None)
+    session.pop("client_user_name", None)
+    flash("You have been logged out successfully.", "info")
+    return redirect(url_for("client_login"))
+
+@app.route("/visitor/feedback", methods=["GET", "POST"])
+def visitor_feedback():
+    if request.method == "POST":
+        rating = int(request.form.get("rating", 0))
+        comments = request.form.get("message", "")
+
+        # Validation
+        if not rating or rating < 1 or rating > 5:
+            flash("Please select a rating.", "danger")
+            return redirect(url_for("visitor_feedback"))
+
+        new_feedback = {
+            "user_id": None,  # No user ID for visitors
+            "user_name": "Anonymous Visitor",
+            "rating": rating,
+            "comments": comments,
+            "date_submitted": datetime.now(),
+            "status": "New"
+        }
+
+        feedback_collection.insert_one(new_feedback)
+
+        # Redirect to thank you page instead of back to form
+        return redirect(url_for("visitor_feedback_thank_you"))
+
+    return render_template("visitor-feedback.html", user_name="Visitor")
 
 
-@app.route("/api/admin/users/<kind>/<user_id>", methods=["DELETE"])
-def admin_delete_user(kind, user_id):
-    """Delete an account. For students/staff, their motorcycles are removed too."""
-    col = _collection_for(kind)
-    oid = to_object_id(user_id)
-    if col is None or oid is None:
-        return jsonify({"error": "Invalid account."}), 400
+@app.route("/client/feedback/thank-you")
+def client_feedback_thank_you():
+    return render_template("client-feedback-thank-you.html")
 
-    result = col.delete_one({"_id": oid})
-    if result.deleted_count == 0:
-        return jsonify({"error": "Account not found."}), 404
+@app.route("/visitor/feedback/thank-you")
+def visitor_feedback_thank_you():
+    return render_template("visitor-feedback-thank-you.html")
 
-    if kind == "user":
-        motorcycles.delete_many({"owner_id": user_id})
-    return jsonify({"deleted": True})
-
-
-# ── Error handlers ───────────────────────────────────────────────────────────
-@app.errorhandler(404)
-def not_found(_):
-    return jsonify({"error": "Not found"}), 404
-
-
-@app.errorhandler(413)
-def file_too_large(_):
-    return jsonify({"error": "File is too large. Max size is 5MB."}), 413
-
-
+# -----------------------------
+# RUN APP
+# -----------------------------
 if __name__ == "__main__":
-    # Debug mode exposes an interactive debugger, so it's off unless you opt in.
-    # For local development, add FLASK_DEBUG=1 to your .env file.
-    debug_mode = os.environ.get("FLASK_DEBUG", "0").strip().lower() in ("1", "true", "yes")
-    app.run(debug=debug_mode, host="0.0.0.0", port=5000)
+    app.run(debug=True)
